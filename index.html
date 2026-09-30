@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- v1 -->
+<title>イチバン簡易出退勤アプリ</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="簡易出退勤">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d0d1a">
+<style>
+:root{
+  --bg:#0d0d1a;--surface:#161628;--surface2:#1e1e35;--border:#2a2a4a;
+  --text:#e8e8f4;--muted:#7878a0;--accent:#4f8ef7;
+  --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#a855f7;--cyan:#06b6d4;
+  --gold:#fbbf24;--hh:54px;--sh:92px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;height:100dvh;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sans-serif;
+  background:var(--bg);color:var(--text);max-width:480px;margin:0 auto;position:relative}
+.hdr{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+  height:calc(var(--hh) + env(safe-area-inset-top,0px));box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;padding-left:14px;padding-right:14px;z-index:1000}
+.hdr-title{font-size:14px;font-weight:700;letter-spacing:.3px;line-height:1.15}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.gear-btn{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px}
+.duty-btn{padding:6px 13px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
+.duty-btn.on{background:var(--green);color:#fff}
+.duty-btn.off{background:var(--red);color:#fff}
+.page{position:fixed;top:calc(var(--hh) + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);
+  width:100%;max-width:480px;bottom:calc(var(--sh) + env(safe-area-inset-bottom,0px));overflow-y:auto}
+.pc{padding:12px}
+.stats-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+  box-sizing:border-box;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));
+  background:var(--surface);border-top:1px solid var(--border);
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;z-index:1000}
+.stat-cell{text-align:center}
+.stat-label{font-size:10px;color:var(--muted);margin-bottom:2px;white-space:nowrap}
+.stat-value{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat-value.gold{color:var(--gold)}
+.stat-value.amber{color:var(--amber)}
+.stat-value.cyan{color:var(--cyan)}
+.stat-value.green{color:var(--green)}
+.sec{font-size:11px;font-weight:700;color:var(--muted);margin:14px 0 8px;
+  text-transform:uppercase;letter-spacing:.8px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:14px;margin-bottom:10px}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:3px}
+input[type=text],input[type=number],input[type=time],input[type=date]{
+  width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;margin-bottom:12px}
+.row2{display:flex;justify-content:space-between;align-items:center;padding:3px 0;margin-bottom:4px}
+.rl{font-size:12px;color:var(--muted)}
+.rv{font-size:13px;font-weight:600}
+.btn{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;
+  font-weight:600;transition:all .2s}
+.btn:active{transform:scale(.95)}
+.btn-p{background:var(--accent);color:#fff}
+.btn-d{background:var(--red);color:#fff}
+.btn-s{background:var(--green);color:#fff}
+.btn-g{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.action-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;padding:12px 4px;border-radius:12px;font-size:11px;font-weight:700;line-height:1.3}
+.action-btn .ic{font-size:22px}
+.fare-pay-btn{padding:10px 4px;border-radius:10px;border:2px solid var(--accent);
+  background:rgba(79,142,247,.15);color:var(--accent);font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .15s}
+.fare-pay-btn.selected{background:var(--accent);color:#fff;box-shadow:0 0 0 2px var(--accent) inset}
+.entry-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:11px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.entry-badge{width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.entry-main{flex:1;min-width:0}
+.entry-title{font-size:13px;font-weight:700}
+.entry-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.entry-amount{font-size:14px;font-weight:800;color:var(--green);white-space:nowrap}
+.entry-del{background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:4px}
+.toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);
+  background:rgba(30,30,60,.95);color:#fff;padding:7px 18px;border-radius:20px;
+  font-size:13px;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;
+  max-width:280px;text-align:center;border:1px solid var(--border)}
+.toast.show{opacity:1}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
+  z-index:2000;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:18px 18px 0 0;padding:18px;
+  width:100%;max-width:480px;max-height:85vh;overflow-y:auto}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between}
+.mc{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}
+.empty-hint{text-align:center;color:var(--muted);font-size:12px;padding:30px 10px}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-title">🚕 簡易出退勤アプリ</div>
+  <div class="hdr-right">
+    <button class="gear-btn" onclick="openSettingsModal()">⚙️</button>
+    <button class="duty-btn off" id="duty-btn" onclick="toggleDuty()">出勤する</button>
+  </div>
+</div>
+
+<div class="page" id="page-main">
+  <div class="pc">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px">
+      <button class="btn btn-p action-btn" onclick="openFareModal()"><span class="ic">💰</span>運賃入力</button>
+      <button class="btn btn-g action-btn" onclick="promptJibaraHighwayEntry()"><span class="ic">🛣</span>自腹高速</button>
+      <button class="btn btn-g action-btn" onclick="promptHighwayEntry()"><span class="ic">🛣</span>無料高速</button>
+      <button class="btn btn-g action-btn" onclick="promptFuelEntry()"><span class="ic">⛽</span>GAS</button>
+    </div>
+    <div class="sec">本日の記録</div>
+    <div id="entries-list"></div>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-cell"><div class="stat-label">本日の出勤時間</div><div class="stat-value" id="stat-start">-</div></div>
+  <div class="stat-cell"><div class="stat-label">本日の上がり予定</div><div class="stat-value" id="stat-finish">-</div></div>
+  <div class="stat-cell"><div class="stat-label">本日の目標</div><div class="stat-value gold" id="stat-target">¥0</div></div>
+  <div class="stat-cell"><div class="stat-label">本日の売上</div><div class="stat-value green" id="stat-sales">¥0</div></div>
+  <div class="stat-cell"><div class="stat-label">本日の残り時間</div><div class="stat-value amber" id="stat-remain">-</div></div>
+  <div class="stat-cell"><div class="stat-label">目標まであと</div><div class="stat-value cyan" id="stat-target-left">¥0</div></div>
+</div>
+
+<!-- 出勤：時刻・メーター・上がり予定 -->
+<div class="overlay" id="duty-start-modal">
+  <div class="modal">
+    <h3>🚕 出勤する <button class="mc" onclick="closeOverlay('duty-start-modal')">✕</button></h3>
+    <label>出勤時刻</label>
+    <input type="time" id="ds-time">
+    <label>営業開始メーター（距離・km）</label>
+    <input type="number" inputmode="decimal" id="ds-meter" placeholder="例: 140031">
+    <label>上がり予定時刻</label>
+    <input type="time" id="ds-finish">
+    <button class="btn btn-p" style="width:100%;padding:12px" onclick="proceedToDeviceConfirm()">次へ（端末の確認）</button>
+  </div>
+</div>
+
+<!-- 端末（名前・車両）の確認 -->
+<div class="overlay" id="duty-device-modal">
+  <div class="modal">
+    <h3>📋 端末の確認 <button class="mc" onclick="closeOverlay('duty-device-modal')">✕</button></h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">この内容で出勤します。違う場合は修正してください。</div>
+    <label>氏名</label>
+    <input type="text" id="dv-name">
+    <label>車両番号</label>
+    <input type="text" id="dv-car">
+    <label>ナンバー</label>
+    <input type="text" id="dv-plate">
+    <button class="btn btn-p" style="width:100%;padding:12px" onclick="confirmStartDuty()">✅ 出勤する</button>
+  </div>
+</div>
+
+<!-- 退勤：時刻・メーター -->
+<div class="overlay" id="duty-end-modal">
+  <div class="modal">
+    <h3>🏁 退勤する <button class="mc" onclick="closeOverlay('duty-end-modal')">✕</button></h3>
+    <label>退勤時刻</label>
+    <input type="time" id="de-time">
+    <label>営業終了メーター（距離・km）</label>
+    <input type="number" inputmode="decimal" id="de-meter" placeholder="例: 140325">
+    <button class="btn btn-p" style="width:100%;padding:12px" onclick="confirmEndDuty()">✅ 退勤する</button>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div class="overlay" id="settings-modal">
+  <div class="modal">
+    <h3>⚙️ 設定 <button class="mc" onclick="closeOverlay('settings-modal')">✕</button></h3>
+    <label>氏名</label>
+    <input type="text" id="s-name">
+    <label>車両番号</label>
+    <input type="text" id="s-car">
+    <label>ナンバー</label>
+    <input type="text" id="s-plate">
+    <div class="sec">目標設定</div>
+    <label>月の目標出勤日数</label>
+    <input type="number" inputmode="numeric" id="s-target-days" placeholder="例: 20">
+    <label>月の目標金額（円・税抜）</label>
+    <input type="number" inputmode="numeric" id="s-target-amount" placeholder="例: 900000">
+    <div class="sec">繰越（アプリ利用開始前の実績）</div>
+    <label>繰越売上（円・税抜）</label>
+    <input type="number" inputmode="numeric" id="s-carry-fare" placeholder="0">
+    <label>繰越出勤日数</label>
+    <input type="number" inputmode="numeric" id="s-carry-days" placeholder="0">
+    <button class="btn btn-p" style="width:100%;padding:12px" onclick="saveSettingsModal()">保存する</button>
+  </div>
+</div>
+
+<!-- 運賃入力 -->
+<div class="overlay" id="fare-modal">
+  <div class="modal" style="max-width:340px;margin:0 auto">
+    <h3>💰 運賃を入力 <button class="mc" onclick="skipFareModal()">✕</button></h3>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600">運賃（円・税込）</div>
+      <input id="fare-input" type="number" inputmode="numeric" placeholder="例: 3200">
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600">高速代（円・ETC）※発生した場合のみ入力</div>
+      <input id="fare-etc-input" type="number" inputmode="numeric" placeholder="0" value="0">
+      <label style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);margin-top:8px">
+        <input type="checkbox" id="fare-etc-diff-method-check" onchange="toggleFareEtcMethodInput()" style="width:16px;height:16px;flex-shrink:0">
+        ETCは運賃と別の支払い方法だった
+      </label>
+      <div id="fare-etc-method-wrap" style="display:none;margin-top:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">ETCの支払い方法をタップして選択</div>
+        <div id="fare-etc-method-btns" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+          <button type="button" class="fare-pay-btn" data-method="cash" onclick="selectFareEtcMethod('cash')" style="padding:8px 2px;font-size:12px">💴現金</button>
+          <button type="button" class="fare-pay-btn" data-method="credit" onclick="selectFareEtcMethod('credit')" style="padding:8px 2px;font-size:12px">💳カード</button>
+          <button type="button" class="fare-pay-btn" data-method="emoney" onclick="selectFareEtcMethod('emoney')" style="padding:8px 2px;font-size:12px">📱電子M</button>
+          <button type="button" class="fare-pay-btn" data-method="qr" onclick="selectFareEtcMethod('qr')" style="padding:8px 2px;font-size:12px">🔲QR</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:18px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)">
+        <input type="checkbox" id="fare-discount-check" onchange="toggleFareDiscountInput()" style="width:18px;height:18px;flex-shrink:0">
+        障害者割引あり
+      </label>
+      <div id="fare-discount-wrap" style="display:none;margin-top:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:600">割引額（円）</div>
+        <input id="fare-discount-input" type="number" inputmode="numeric" placeholder="例: 640">
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">支払い方法をタップして選択</div>
+    <div id="fare-pay-btns" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <button class="fare-pay-btn" data-method="cash" onclick="selectFarePaymentMethod('cash')">💴 現金</button>
+      <button class="fare-pay-btn" data-method="credit" onclick="selectFarePaymentMethod('credit')">💳 クレジット</button>
+      <button class="fare-pay-btn" data-method="emoney" onclick="selectFarePaymentMethod('emoney')">📱 電子マネー</button>
+      <button class="fare-pay-btn" data-method="ticket" onclick="selectFarePaymentMethod('ticket')">🎫 チケット</button>
+      <button class="fare-pay-btn" data-method="qr" onclick="selectFarePaymentMethod('qr')">🔲 QRコード</button>
+      <button class="fare-pay-btn" data-method="welfare" onclick="selectFarePaymentMethod('welfare')">🎫 福祉券</button>
+    </div>
+    <button id="fare-split-toggle-btn" type="button" onclick="toggleFareSplitMode()" style="width:100%;padding:8px;margin-bottom:12px;border-radius:10px;border:2px solid var(--muted);background:none;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer">🔀 分割払いにする（2つの決済方法を使う）</button>
+    <div id="fare-split-area" style="display:none;margin-bottom:14px;padding:10px;border:1px dashed var(--border);border-radius:10px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">内訳の金額を入力してから、上の支払い方法ボタンを押して割り当ててください（2つまで）</div>
+      <input id="fare-split-amount-input" type="number" inputmode="numeric" placeholder="内訳の金額" style="margin-bottom:8px">
+      <div id="fare-split-list" style="display:flex;flex-direction:column;gap:4px"></div>
+    </div>
+    <button onclick="confirmFareModal()" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">✅ 登録する</button>
+    <button onclick="skipFareModal()" style="width:100%;padding:11px;border:2px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font-size:13px;font-weight:700;cursor:pointer">キャンセル</button>
+  </div>
+</div>
+
+<!-- 日次精算レポート -->
+<div class="overlay" id="settlement-report-modal" style="z-index:9600">
+  <div class="modal" style="max-width:380px;margin:0 auto">
+    <h3 style="justify-content:center;position:relative">🧾 本日の納金額</h3>
+    <div id="settlement-date-label" style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px;margin-top:-10px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div style="border:1px solid var(--border);border-radius:10px;padding:9px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-align:center;margin-bottom:6px">燃料</div>
+        <div id="settlement-fuel-rows" style="font-size:11px;color:var(--muted);line-height:1.6"></div>
+        <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:13px;font-weight:800">
+          <span>計</span><span id="settlement-fuel-total">0.00L</span>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:10px;padding:9px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-align:center;margin-bottom:6px">車両メーター</div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <tr><td style="color:var(--muted);padding:2px 0">本日</td><td id="settlement-meter-end" style="text-align:right;font-weight:700">−</td></tr>
+          <tr><td style="color:var(--muted);padding:2px 0">前日</td><td id="settlement-meter-start" style="text-align:right;font-weight:700">−</td></tr>
+          <tr><td style="color:var(--muted);padding:2px 0">差引</td><td id="settlement-meter-diff" style="text-align:right;font-weight:800;color:var(--gold)">−</td></tr>
+        </table>
+      </div>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--muted)">税込営収（割引前）</span><span id="settlement-revenue-before" style="font-weight:700">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--muted)">障害者割引</span><span id="settlement-discount" style="font-weight:700">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--muted)">税込営収（割引後）</span><span id="settlement-revenue-after" style="font-weight:700">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--muted)">クレジット</span><span id="settlement-credit" style="font-weight:700">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--muted)">電子マネー</span><span id="settlement-emoney" style="font-weight:700">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span id="settlement-ticket-label" style="color:var(--muted)">チケット0枚　福祉券0枚</span><span id="settlement-ticket" style="font-weight:700">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--muted)">QRコード</span><span id="settlement-qr" style="font-weight:700">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--muted)">ETC（高速代）</span><span id="settlement-etc" style="font-weight:700">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border);font-size:14px;background:rgba(251,191,36,.08)">
+        <span style="font-weight:700">差引合計</span><span id="settlement-cash-total" style="font-weight:800;color:var(--gold)">¥0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="color:var(--muted)">未収金</span>
+        <input id="settlement-uncollected-input" type="number" inputmode="numeric" oninput="onSettlementFieldEdit()"
+          style="width:100px;margin-bottom:0;text-align:right;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:13px;font-weight:700;color:var(--text)">
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:15px;background:rgba(251,191,36,.14)">
+        <span style="font-weight:800">納金額</span><span id="settlement-payment-amount" style="font-weight:800;color:var(--gold);font-size:17px">¥0</span>
+      </div>
+    </div>
+    <button onclick="closeSettlementReport()" class="btn btn-p" style="width:100%;padding:12px;font-size:15px;font-weight:700">閉じる</button>
+  </div>
+</div>
+
+<!-- 数字入力キーパッド -->
+<div class="overlay" id="num-keypad-overlay" style="z-index:9500">
+  <div class="modal" style="max-width:300px">
+    <h3><span id="num-keypad-title-text">数字を入力</span> <button class="mc" onclick="cancelNumKeypad()">✕</button></h3>
+    <div id="num-keypad-display" style="text-align:center;font-size:32px;font-weight:800;
+      font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--cyan);
+      background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:14px;word-break:break-all">0</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('1')" style="padding:16px;font-size:18px">1</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('2')" style="padding:16px;font-size:18px">2</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('3')" style="padding:16px;font-size:18px">3</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('4')" style="padding:16px;font-size:18px">4</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('5')" style="padding:16px;font-size:18px">5</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('6')" style="padding:16px;font-size:18px">6</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('7')" style="padding:16px;font-size:18px">7</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('8')" style="padding:16px;font-size:18px">8</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('9')" style="padding:16px;font-size:18px">9</button>
+      <button type="button" class="btn btn-g" id="num-keypad-dot" onclick="numKeypadPress('.')" style="padding:16px;font-size:18px;color:var(--accent)">．</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadPress('0')" style="padding:16px;font-size:18px">0</button>
+      <button type="button" class="btn btn-g" onclick="numKeypadBackspace()" style="padding:16px;font-size:18px">⌫</button>
+    </div>
+    <button class="btn btn-p" onclick="confirmNumKeypad()" style="width:100%">確定</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 基本ユーティリティ =====
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+}
+function closeOverlay(id){document.getElementById(id).classList.remove('open');}
+function openOverlay(id){document.getElementById(id).classList.add('open');}
+function round10(n){return Math.round((n||0)/10)*10;}
+function exTax(fare){return round10((fare||0)/1.1);}
+function fmtYen(n){return '¥'+Math.round(n||0).toLocaleString();}
+function fmtHM(d){return d?new Date(d).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'-';}
+function toHMS(sec){
+  sec=Math.max(0,Math.floor(sec));
+  const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+function todayDateStr(d){return (d||new Date()).toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});}
+
+// ===== 数字入力キーパッド（汎用） =====
+let numKeypadResolve=null;
+function promptNumber(title,defaultValue,allowDecimal){
+  return new Promise(resolve=>{
+    numKeypadResolve=resolve;
+    document.getElementById('num-keypad-title-text').textContent=String(title||'').replace(/\n/g,' ');
+    const dv=(defaultValue!==undefined&&defaultValue!==null&&defaultValue!=='')?String(defaultValue):'0';
+    document.getElementById('num-keypad-display').textContent=dv;
+    document.getElementById('num-keypad-dot').style.display=allowDecimal?'':'none';
+    openOverlay('num-keypad-overlay');
+  });
+}
+function numKeypadPress(ch){
+  const disp=document.getElementById('num-keypad-display');
+  let cur=disp.textContent==='0'?'':disp.textContent;
+  if(ch==='.'){
+    if(cur.includes('.'))return;
+    cur=(cur||'0')+'.';
+  }else{
+    if(cur.length>=12)return;
+    cur+=ch;
+  }
+  disp.textContent=cur||'0';
+}
+function numKeypadBackspace(){
+  const disp=document.getElementById('num-keypad-display');
+  disp.textContent=disp.textContent.slice(0,-1)||'0';
+}
+function confirmNumKeypad(){
+  const val=document.getElementById('num-keypad-display').textContent;
+  closeOverlay('num-keypad-overlay');
+  if(numKeypadResolve){const r=numKeypadResolve;numKeypadResolve=null;r(val);}
+}
+function cancelNumKeypad(){
+  closeOverlay('num-keypad-overlay');
+  if(numKeypadResolve){const r=numKeypadResolve;numKeypadResolve=null;r(null);}
+}
+
+// ===== 設定 =====
+function loadSettings(){
+  try{return JSON.parse(localStorage.getItem('sa_settings')||'{}');}catch(e){return {};}
+}
+function saveSettings(s){localStorage.setItem('sa_settings',JSON.stringify(s));}
+function openSettingsModal(){
+  const s=loadSettings();
+  document.getElementById('s-name').value=s.name||'';
+  document.getElementById('s-car').value=s.car||'';
+  document.getElementById('s-plate').value=s.plate||'';
+  document.getElementById('s-target-days').value=s.targetDays||'';
+  document.getElementById('s-target-amount').value=s.targetAmount||'';
+  document.getElementById('s-carry-fare').value=s.carryFare||'';
+  document.getElementById('s-carry-days').value=s.carryDays||'';
+  openOverlay('settings-modal');
+}
+function saveSettingsModal(){
+  const s={
+    name:document.getElementById('s-name').value.trim(),
+    car:document.getElementById('s-car').value.trim(),
+    plate:document.getElementById('s-plate').value.trim(),
+    targetDays:parseInt(document.getElementById('s-target-days').value)||0,
+    targetAmount:parseInt(document.getElementById('s-target-amount').value)||0,
+    carryFare:parseInt(document.getElementById('s-carry-fare').value)||0,
+    carryDays:parseInt(document.getElementById('s-carry-days').value)||0
+  };
+  saveSettings(s);
+  closeOverlay('settings-modal');
+  toast('✅ 設定を保存しました');
+  renderStatsBar();
+}
+
+// ===== 出退勤の状態 =====
+let isDuty=false,dutyStart=null,dutyStartMeter=null,planFinishTs=null;
+let fuelEntries=[],highwayEntries=[],jibaraHighwayEntries=[];
+let dutyInterval=null;
+
+function saveRuntimeState(){
+  localStorage.setItem('sa_runtime_state',JSON.stringify({
+    isDuty,dutyStartTs:dutyStart?dutyStart.getTime():null,dutyStartMeter,
+    planFinishTs,fuelEntries,highwayEntries,jibaraHighwayEntries
+  }));
+}
+function restoreRuntimeState(){
+  let st;try{st=JSON.parse(localStorage.getItem('sa_runtime_state')||'null');}catch(e){st=null;}
+  if(!st||!st.isDuty)return;
+  isDuty=true;
+  dutyStart=st.dutyStartTs?new Date(st.dutyStartTs):new Date();
+  dutyStartMeter=st.dutyStartMeter||null;
+  planFinishTs=st.planFinishTs||null;
+  fuelEntries=Array.isArray(st.fuelEntries)?st.fuelEntries:[];
+  highwayEntries=Array.isArray(st.highwayEntries)?st.highwayEntries:[];
+  jibaraHighwayEntries=Array.isArray(st.jibaraHighwayEntries)?st.jibaraHighwayEntries:[];
+  applyDutyUI();
+}
+function applyDutyUI(){
+  const btn=document.getElementById('duty-btn');
+  if(isDuty){btn.textContent='退勤する';btn.className='duty-btn on';}
+  else{btn.textContent='出勤する';btn.className='duty-btn off';}
+  if(dutyInterval)clearInterval(dutyInterval);
+  if(isDuty)dutyInterval=setInterval(()=>{renderStatsBar();},1000);
+  renderStatsBar();
+  renderEntriesList();
+}
+
+function toggleDuty(){
+  if(isDuty){openDutyEndModal();}
+  else{openDutyStartModal();}
+}
+function openDutyStartModal(){
+  const now=new Date();
+  document.getElementById('ds-time').value=now.toTimeString().slice(0,5);
+  document.getElementById('ds-meter').value='';
+  const def=new Date(now.getTime()+9*3600*1000);
+  document.getElementById('ds-finish').value=def.toTimeString().slice(0,5);
+  openOverlay('duty-start-modal');
+}
+let pendingDutyStart=null;
+function proceedToDeviceConfirm(){
+  const timeVal=document.getElementById('ds-time').value;
+  const meterVal=parseFloat(document.getElementById('ds-meter').value);
+  const finishVal=document.getElementById('ds-finish').value;
+  if(!timeVal){toast('⚠️ 出勤時刻を入力してください');return;}
+  if(!meterVal&&meterVal!==0){toast('⚠️ 営業開始メーターを入力してください');return;}
+  const now=new Date();
+  const [h,m]=timeVal.split(':').map(Number);
+  let startDate=new Date(now.getFullYear(),now.getMonth(),now.getDate(),h,m,0);
+  if(startDate.getTime()>now.getTime()+5*60*1000)startDate=new Date(startDate.getTime()-24*3600*1000);
+  let finishTs=null;
+  if(finishVal){
+    const [fh,fm]=finishVal.split(':').map(Number);
+    let finishDate=new Date(startDate.getFullYear(),startDate.getMonth(),startDate.getDate(),fh,fm,0);
+    if(finishDate.getTime()<=startDate.getTime())finishDate=new Date(finishDate.getTime()+24*3600*1000);
+    finishTs=finishDate.getTime();
+  }
+  pendingDutyStart={startTs:startDate.getTime(),meter:meterVal,finishTs};
+  const s=loadSettings();
+  document.getElementById('dv-name').value=s.name||'';
+  document.getElementById('dv-car').value=s.car||'';
+  document.getElementById('dv-plate').value=s.plate||'';
+  closeOverlay('duty-start-modal');
+  openOverlay('duty-device-modal');
+}
+function confirmStartDuty(){
+  if(!pendingDutyStart)return;
+  const s=loadSettings();
+  s.name=document.getElementById('dv-name').value.trim();
+  s.car=document.getElementById('dv-car').value.trim();
+  s.plate=document.getElementById('dv-plate').value.trim();
+  saveSettings(s);
+  isDuty=true;
+  dutyStart=new Date(pendingDutyStart.startTs);
+  dutyStartMeter=pendingDutyStart.meter;
+  planFinishTs=pendingDutyStart.finishTs;
+  fuelEntries=[];highwayEntries=[];jibaraHighwayEntries=[];
+  pendingDutyStart=null;
+  saveRuntimeState();
+  closeOverlay('duty-device-modal');
+  applyDutyUI();
+  toast('🚕 出勤しました');
+}
+function openDutyEndModal(){
+  const now=new Date();
+  document.getElementById('de-time').value=now.toTimeString().slice(0,5);
+  document.getElementById('de-meter').value='';
+  openOverlay('duty-end-modal');
+}
+function confirmEndDuty(){
+  const timeVal=document.getElementById('de-time').value;
+  const meterVal=parseFloat(document.getElementById('de-meter').value);
+  if(!timeVal){toast('⚠️ 退勤時刻を入力してください');return;}
+  if(!meterVal&&meterVal!==0){toast('⚠️ 営業終了メーターを入力してください');return;}
+  if(dutyStartMeter!=null&&meterVal<dutyStartMeter){toast('⚠️ 終了メーターが開始メーターより小さいです');return;}
+  const now=new Date();
+  const [h,m]=timeVal.split(':').map(Number);
+  let endDate=new Date(dutyStart.getFullYear(),dutyStart.getMonth(),dutyStart.getDate(),h,m,0);
+  if(endDate.getTime()<dutyStart.getTime())endDate=new Date(endDate.getTime()+24*3600*1000);
+  const shiftStartTs=dutyStart.getTime();
+  const shiftEndTs=endDate.getTime();
+  const record=buildSettlementRecord(shiftStartTs,shiftEndTs,dutyStartMeter,meterVal,fuelEntries,highwayEntries,jibaraHighwayEntries);
+  const shiftLog=JSON.parse(localStorage.getItem('sa_shift_log')||'[]');
+  shiftLog.push({dateStr:record.dateStr,startTs:shiftStartTs,endTs:shiftEndTs,meterStart:dutyStartMeter,meterEnd:meterVal});
+  localStorage.setItem('sa_shift_log',JSON.stringify(shiftLog));
+  isDuty=false;dutyStart=null;dutyStartMeter=null;planFinishTs=null;
+  fuelEntries=[];highwayEntries=[];jibaraHighwayEntries=[];
+  localStorage.removeItem('sa_runtime_state');
+  closeOverlay('duty-end-modal');
+  applyDutyUI();
+  showSettlementReport(record);
+}
+
+// ===== GAS・高速代の記録 =====
+function fuelTotalLiters(){return fuelEntries.reduce((a,e)=>a+(e.amount||0),0);}
+function highwayTotalYen(){return highwayEntries.reduce((a,e)=>a+(e.amount||0),0);}
+function jibaraHighwayTotalYen(){return jibaraHighwayEntries.reduce((a,e)=>a+(e.amount||0),0);}
+async function promptFuelEntry(){
+  if(!isDuty){toast('⚠️ 出勤中のみ記録できます');return;}
+  const val=await promptNumber('給油量（リットル）','',true);
+  if(val===null)return;
+  const amount=Math.round((parseFloat(val)||0)*100)/100;
+  if(!amount||amount<=0){toast('⚠️ 正しい数値を入力してください');return;}
+  fuelEntries.push({amount,ts:Date.now()});
+  saveRuntimeState();
+  toast(`⛽ ${amount.toFixed(2)}L を記録しました（本日計 ${fuelTotalLiters().toFixed(2)}L）`);
+  renderEntriesList();
+}
+async function promptHighwayEntry(){
+  if(!isDuty){toast('⚠️ 出勤中のみ記録できます');return;}
+  const val=await promptNumber('無料高速（実質無料の高速料金・円）','');
+  if(val===null)return;
+  const amount=parseInt(val)||0;
+  if(amount<=0){toast('⚠️ 正しい金額を入力してください');return;}
+  highwayEntries.push({amount,ts:Date.now()});
+  saveRuntimeState();
+  toast(`🛣️ ¥${amount.toLocaleString()} を記録しました（本日計 ¥${highwayTotalYen().toLocaleString()}）`);
+  renderEntriesList();
+}
+async function promptJibaraHighwayEntry(){
+  if(!isDuty){toast('⚠️ 出勤中のみ記録できます');return;}
+  const val=await promptNumber('自腹高速（戻ってこない高速料金・円）','');
+  if(val===null)return;
+  const amount=parseInt(val)||0;
+  if(amount<=0){toast('⚠️ 正しい金額を入力してください');return;}
+  jibaraHighwayEntries.push({amount,ts:Date.now()});
+  saveRuntimeState();
+  toast(`🛣️ ¥${amount.toLocaleString()} を記録しました（本日計 ¥${jibaraHighwayTotalYen().toLocaleString()}）`);
+  renderEntriesList();
+}
+function deleteFuelEntry(ts){
+  fuelEntries=fuelEntries.filter(e=>e.ts!==ts);
+  saveRuntimeState();renderEntriesList();toast('🗑 削除しました');
+}
+function deleteHighwayEntry(ts){
+  highwayEntries=highwayEntries.filter(e=>e.ts!==ts);
+  saveRuntimeState();renderEntriesList();toast('🗑 削除しました');
+}
+function deleteJibaraEntry(ts){
+  jibaraHighwayEntries=jibaraHighwayEntries.filter(e=>e.ts!==ts);
+  saveRuntimeState();renderEntriesList();toast('🗑 削除しました');
+}
+
+// ===== 運賃入力（支払い方法・割引・ETC・分割払い） =====
+let selectedFarePaymentMethod=null,pendingWelfareSheets=0,pendingEtcPaymentMethod=null;
+let fareSplitMode=false,fareSplitEntries=[];
+function paymentMethodLabel(method){
+  return {cash:'現金',credit:'クレジット',emoney:'電子マネー',ticket:'チケット',qr:'QRコード',welfare:'福祉券'}[method]||method;
+}
+function openFareModal(){
+  if(!isDuty){toast('⚠️ 出勤中のみ記録できます');return;}
+  document.getElementById('fare-input').value='';
+  document.getElementById('fare-etc-input').value='0';
+  document.getElementById('fare-etc-diff-method-check').checked=false;
+  document.getElementById('fare-discount-check').checked=false;
+  document.getElementById('fare-discount-input').value='';
+  document.getElementById('fare-discount-wrap').style.display='none';
+  document.getElementById('fare-etc-method-wrap').style.display='none';
+  selectedFarePaymentMethod=null;pendingWelfareSheets=0;pendingEtcPaymentMethod=null;
+  fareSplitMode=false;fareSplitEntries=[];
+  document.getElementById('fare-split-area').style.display='none';
+  document.getElementById('fare-split-toggle-btn').textContent='🔀 分割払いにする（2つの決済方法を使う）';
+  renderFareSplitList();
+  updateFarePaymentButtonsUI();updateFareEtcMethodButtonsUI();
+  openOverlay('fare-modal');
+}
+function skipFareModal(){closeOverlay('fare-modal');}
+function toggleFareEtcMethodInput(){
+  const checked=document.getElementById('fare-etc-diff-method-check').checked;
+  document.getElementById('fare-etc-method-wrap').style.display=checked?'block':'none';
+  if(!checked)pendingEtcPaymentMethod=null;
+  updateFareEtcMethodButtonsUI();
+}
+function selectFareEtcMethod(method){
+  pendingEtcPaymentMethod=(pendingEtcPaymentMethod===method)?null:method;
+  updateFareEtcMethodButtonsUI();
+}
+function updateFareEtcMethodButtonsUI(){
+  document.querySelectorAll('#fare-etc-method-btns .fare-pay-btn').forEach(btn=>{
+    btn.classList.toggle('selected',btn.dataset.method===pendingEtcPaymentMethod);
+  });
+}
+function toggleFareSplitMode(){
+  fareSplitMode=!fareSplitMode;
+  fareSplitEntries=[];
+  selectedFarePaymentMethod=null;
+  document.getElementById('fare-split-area').style.display=fareSplitMode?'block':'none';
+  document.getElementById('fare-split-toggle-btn').textContent=fareSplitMode?'🔀 分割払いをやめる':'🔀 分割払いにする（2つの決済方法を使う）';
+  renderFareSplitList();
+  updateFarePaymentButtonsUI();
+  if(fareSplitMode){
+    const total=parseInt(document.getElementById('fare-input').value)||0;
+    document.getElementById('fare-split-amount-input').value=total>0?total:'';
+  }
+}
+function renderFareSplitList(){
+  const el=document.getElementById('fare-split-list');
+  if(!el)return;
+  el.innerHTML=fareSplitEntries.map((e,i)=>{
+    const w=e.method==='welfare'?`（${e.welfareSheets||0}枚）`:'';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;background:var(--surface2);border-radius:6px;padding:5px 8px">
+      <span>${paymentMethodLabel(e.method)}${w}　¥${e.amount.toLocaleString()}</span>
+      <button onclick="removeFareSplitEntry(${i})" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">✕</button>
+    </div>`;
+  }).join('');
+}
+function removeFareSplitEntry(i){
+  fareSplitEntries.splice(i,1);
+  renderFareSplitList();
+  const total=parseInt(document.getElementById('fare-input').value)||0;
+  const used=fareSplitEntries.reduce((a,e)=>a+e.amount,0);
+  document.getElementById('fare-split-amount-input').value=Math.max(total-used,0)||'';
+}
+function toggleFareDiscountInput(){
+  const checked=document.getElementById('fare-discount-check').checked;
+  document.getElementById('fare-discount-wrap').style.display=checked?'block':'none';
+}
+async function selectFarePaymentMethod(method){
+  if(fareSplitMode){
+    if(fareSplitEntries.length>=2){toast('⚠️ 分割は2つまでです');return;}
+    const amount=parseInt(document.getElementById('fare-split-amount-input').value)||0;
+    if(amount<=0){toast('⚠️ 内訳の金額を入力してください');return;}
+    let welfareSheets=0;
+    if(method==='welfare'){
+      const val=await promptNumber('福祉券の枚数',1);
+      if(val===null)return;
+      welfareSheets=parseInt(val)||0;
+    }
+    fareSplitEntries.push({method,amount,welfareSheets});
+    renderFareSplitList();
+    const total=parseInt(document.getElementById('fare-input').value)||0;
+    const used=fareSplitEntries.reduce((a,e)=>a+e.amount,0);
+    document.getElementById('fare-split-amount-input').value=fareSplitEntries.length<2?(Math.max(total-used,0)||''):'';
+    return;
+  }
+  const turningOn=selectedFarePaymentMethod!==method;
+  selectedFarePaymentMethod=turningOn?method:null;
+  updateFarePaymentButtonsUI();
+  if(method==='welfare'&&turningOn){
+    const val=await promptNumber('福祉券の枚数',pendingWelfareSheets||1);
+    pendingWelfareSheets=val===null?0:(parseInt(val)||0);
+  }
+}
+function updateFarePaymentButtonsUI(){
+  document.querySelectorAll('#fare-pay-btns .fare-pay-btn').forEach(btn=>{
+    btn.classList.toggle('selected',btn.dataset.method===selectedFarePaymentMethod);
+  });
+}
+function confirmFareModal(){
+  const fare=parseInt(document.getElementById('fare-input').value)||0;
+  if(fare<=0){toast('⚠️ 運賃を入力してください');return;}
+  const etc=parseInt(document.getElementById('fare-etc-input').value)||0;
+  const discountChecked=document.getElementById('fare-discount-check').checked;
+  const discount=discountChecked?(parseInt(document.getElementById('fare-discount-input').value)||0):0;
+  const etcPaymentMethod=(etc>0&&document.getElementById('fare-etc-diff-method-check').checked&&pendingEtcPaymentMethod)?pendingEtcPaymentMethod:null;
+  if(fareSplitMode){
+    if(fareSplitEntries.length<2){toast('⚠️ 分割する支払い方法を2つとも割り当ててください');return;}
+    const used=fareSplitEntries.reduce((a,e)=>a+e.amount,0);
+    if(used!==fare){toast(`⚠️ 内訳の合計（¥${used.toLocaleString()}）が運賃（¥${fare.toLocaleString()}）と一致しません`);return;}
+    const tripTs=Date.now();
+    fareSplitEntries.forEach((e,i)=>{
+      saveFareEntry(e.amount,tripTs,e.method,i===0?discount:0,i===0?etc:0,e.method==='welfare'?e.welfareSheets:0,i===0?etcPaymentMethod:null);
+    });
+    closeOverlay('fare-modal');
+    return;
+  }
+  if(!selectedFarePaymentMethod){toast('⚠️ 支払い方法を選択してください');return;}
+  const welfareSheets=selectedFarePaymentMethod==='welfare'?pendingWelfareSheets:0;
+  saveFareEntry(fare,Date.now(),selectedFarePaymentMethod,discount,etc,welfareSheets,etcPaymentMethod);
+  closeOverlay('fare-modal');
+}
+function saveFareEntry(fare,tripTs,paymentMethod,discount,etc,welfareSheets,etcPaymentMethod){
+  const entry={
+    dateStr:todayDateStr(),
+    fare,ts:tripTs,paymentMethod:paymentMethod||null,
+    discount:discount||0,etc:etc||0,welfareSheets:welfareSheets||0,etcPaymentMethod:etcPaymentMethod||null
+  };
+  const log=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
+  log.push(entry);
+  localStorage.setItem('sa_fare_log',JSON.stringify(log));
+  toast(`💰 運賃 ¥${fare.toLocaleString()} を記録しました`);
+  renderEntriesList();renderStatsBar();
+}
+function deleteFareEntry(ts){
+  if(!confirm('この運賃記録を削除しますか？'))return;
+  let log=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
+  log=log.filter(e=>e.ts!==ts);
+  localStorage.setItem('sa_fare_log',JSON.stringify(log));
+  renderEntriesList();renderStatsBar();
+  toast('🗑 削除しました');
+}
+
+// ===== 本日の記録（通し番号を付けて時系列表示） =====
+// 送り先（乗車）の通し番号(#1,#2...)は、出勤してからの記録の古い順に振り直す。
+// 仲間アプリと同じく、乗車の何件目かが一目で分かるようにする
+function renderEntriesList(){
+  const el=document.getElementById('entries-list');
+  if(!isDuty){
+    el.innerHTML='<div class="empty-hint">出勤すると、ここに本日の記録が表示されます</div>';
+    return;
+  }
+  const shiftStart=dutyStart.getTime();
+  const fareLog=JSON.parse(localStorage.getItem('sa_fare_log')||'[]').filter(e=>(e.ts||0)>=shiftStart);
+  const items=[];
+  fareLog.sort((a,b)=>a.ts-b.ts);
+  // 通し番号は出勤してからの乗車順（1件目から）で振り直す
+  let n=0;
+  fareLog.forEach(e=>{
+    n++;
+    const method=e.paymentMethod?paymentMethodLabel(e.paymentMethod):'未設定';
+    const sub=[method,e.discount?`割引¥${e.discount.toLocaleString()}`:null,e.etc?`ETC¥${e.etc.toLocaleString()}`:null].filter(Boolean).join('　');
+    items.push({ts:e.ts,html:`<div class="entry-card">
+      <div class="entry-badge" style="background:var(--accent)">#${n}</div>
+      <div class="entry-main"><div class="entry-title">${fmtHM(e.ts)} 運賃</div><div class="entry-sub">${sub}</div></div>
+      <div class="entry-amount">¥${e.fare.toLocaleString()}</div>
+      <button class="entry-del" onclick="deleteFareEntry(${e.ts})">削除</button>
+    </div>`});
+  });
+  fuelEntries.forEach(e=>{
+    items.push({ts:e.ts,html:`<div class="entry-card">
+      <div class="entry-badge" style="background:var(--red)">⛽</div>
+      <div class="entry-main"><div class="entry-title">${fmtHM(e.ts)} 燃料</div></div>
+      <div class="entry-amount" style="color:var(--text)">${e.amount.toFixed(2)}L</div>
+      <button class="entry-del" onclick="deleteFuelEntry(${e.ts})">削除</button>
+    </div>`});
+  });
+  highwayEntries.forEach(e=>{
+    items.push({ts:e.ts,html:`<div class="entry-card">
+      <div class="entry-badge" style="background:var(--cyan)">🛣</div>
+      <div class="entry-main"><div class="entry-title">${fmtHM(e.ts)} 無料高速</div></div>
+      <div class="entry-amount" style="color:var(--text)">¥${e.amount.toLocaleString()}</div>
+      <button class="entry-del" onclick="deleteHighwayEntry(${e.ts})">削除</button>
+    </div>`});
+  });
+  jibaraHighwayEntries.forEach(e=>{
+    items.push({ts:e.ts,html:`<div class="entry-card">
+      <div class="entry-badge" style="background:var(--purple)">🛣</div>
+      <div class="entry-main"><div class="entry-title">${fmtHM(e.ts)} 自腹高速</div></div>
+      <div class="entry-amount" style="color:var(--text)">¥${e.amount.toLocaleString()}</div>
+      <button class="entry-del" onclick="deleteJibaraEntry(${e.ts})">削除</button>
+    </div>`});
+  });
+  if(!items.length){el.innerHTML='<div class="empty-hint">まだ本日の記録はありません</div>';return;}
+  items.sort((a,b)=>b.ts-a.ts);
+  el.innerHTML=items.map(i=>i.html).join('');
+}
+
+// ===== 下部：売上・時間管理 =====
+function getMonthShifts(){
+  const shiftLog=JSON.parse(localStorage.getItem('sa_shift_log')||'[]');
+  const now=new Date();
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1).getTime();
+  return shiftLog.filter(s=>s.startTs>=monthStart);
+}
+function getTodayFareEntries(){
+  if(!isDuty||!dutyStart)return [];
+  const log=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
+  return log.filter(e=>(e.ts||0)>=dutyStart.getTime());
+}
+function renderStatsBar(){
+  const s=loadSettings();
+  document.getElementById('stat-start').textContent=isDuty?fmtHM(dutyStart):'-';
+  document.getElementById('stat-finish').textContent=(isDuty&&planFinishTs)?fmtHM(planFinishTs):'-';
+  const todayEntries=getTodayFareEntries();
+  const todaySales=todayEntries.reduce((a,e)=>a+exTax(e.fare||0),0);
+  document.getElementById('stat-sales').textContent=fmtYen(todaySales);
+  // 本日の目標＝（月の目標金額－前日までの売上）÷残り出勤日数
+  const targetDays=s.targetDays||0,targetAmount=s.targetAmount||0;
+  const monthFareLog=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
+  const now=new Date();
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1).getTime();
+  const monthSalesAll=monthFareLog.filter(e=>(e.ts||0)>=monthStart).reduce((a,e)=>a+exTax(e.fare||0),0)+(s.carryFare||0);
+  const salesBeforeToday=monthSalesAll-todaySales;
+  const workedDaysBeforeToday=getMonthShifts().length+(s.carryDays||0);
+  const remainDays=targetDays-workedDaysBeforeToday;
+  const dailyTarget=targetDays>0
+    ?(remainDays>0?(targetAmount-salesBeforeToday)/remainDays:Math.max(targetAmount-salesBeforeToday,0))
+    :0;
+  document.getElementById('stat-target').textContent=fmtYen(dailyTarget);
+  document.getElementById('stat-target-left').textContent=fmtYen(Math.max(dailyTarget-todaySales,0));
+  if(isDuty&&planFinishTs){
+    const remainSec=Math.max(0,Math.floor((planFinishTs-Date.now())/1000));
+    document.getElementById('stat-remain').textContent=toHMS(remainSec);
+  }else{
+    document.getElementById('stat-remain').textContent='-';
+  }
+}
+
+// ===== 日次精算 =====
+function buildSettlementRecord(shiftStartTs,shiftEndTs,meterStart,meterEnd,fuelEntriesArg,highwayEntriesArg,jibaraHighwayEntriesArg){
+  const fareLog=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
+  const shiftFares=fareLog.filter(e=>(e.ts||0)>=shiftStartTs&&(e.ts||0)<=shiftEndTs);
+  const revenueAfterDiscount=shiftFares.reduce((a,e)=>a+(e.fare||0),0);
+  const discountTotal=shiftFares.reduce((a,e)=>a+(e.discount||0),0);
+  const revenueBeforeDiscount=revenueAfterDiscount+discountTotal;
+  const sumByMethod=m=>{
+    let total=0;
+    shiftFares.forEach(e=>{
+      if(e.paymentMethod===m)total+=(e.fare||0);
+      if(e.etc&&(e.etcPaymentMethod||e.paymentMethod)===m)total+=e.etc;
+    });
+    return total;
+  };
+  const credit=sumByMethod('credit');
+  const emoney=sumByMethod('emoney');
+  const welfareEntries=shiftFares.filter(e=>e.paymentMethod==='welfare');
+  const welfareCount=welfareEntries.reduce((a,e)=>a+(e.welfareSheets||0),0);
+  const ticketCount=shiftFares.filter(e=>e.paymentMethod==='ticket').length;
+  const ticket=sumByMethod('ticket')+sumByMethod('welfare');
+  const qr=sumByMethod('qr');
+  const fuel=Array.isArray(fuelEntriesArg)?fuelEntriesArg:[];
+  const highway=Array.isArray(highwayEntriesArg)?highwayEntriesArg:[];
+  const jibaraHighway=Array.isArray(jibaraHighwayEntriesArg)?jibaraHighwayEntriesArg:[];
+  const fuelTotal=fuel.reduce((a,e)=>a+(e.amount||0),0);
+  const highwayTotal=highway.reduce((a,e)=>a+(e.amount||0),0);
+  const jibaraHighwayTotal=jibaraHighway.reduce((a,e)=>a+(e.amount||0),0);
+  const etc=shiftFares.reduce((a,e)=>a+(e.etc||0),0);
+  return {
+    dateStr:new Date(shiftStartTs).toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'}),
+    shiftStartTs,shiftEndTs,
+    meterStart:meterStart!=null?meterStart:null,meterEnd:meterEnd!=null?meterEnd:null,
+    meterDiff:(meterStart!=null&&meterEnd!=null&&meterEnd>=meterStart)?(meterEnd-meterStart):null,
+    fuelTotal,fuelEntries:fuel,
+    highwayTotal,highwayEntries:highway,
+    jibaraHighwayTotal,jibaraHighwayEntries:jibaraHighway,
+    revenueBeforeDiscount,discountTotal,revenueAfterDiscount,
+    credit,emoney,ticket,ticketCount,welfareCount,qr,
+    etc,uncollected:0
+  };
+}
+function settlementEtcDisplay(record){
+  return (record.etc||0)+(record.jibaraHighwayTotal||0);
+}
+function computeSettlementTotals(record){
+  const electronicTotal=record.credit+record.emoney+record.ticket+record.qr;
+  const cashSettleTotal=record.revenueBeforeDiscount-electronicTotal+settlementEtcDisplay(record);
+  const paymentAmount=cashSettleTotal-(record.uncollected||0);
+  return {cashSettleTotal,paymentAmount};
+}
+let currentSettlementRecord=null;
+function showSettlementReport(record){
+  currentSettlementRecord=record;
+  document.getElementById('settlement-date-label').textContent=record.dateStr;
+  document.getElementById('settlement-fuel-rows').innerHTML=record.fuelEntries.length
+    ?record.fuelEntries.map(e=>`${fmtHM(e.ts)}　${e.amount.toFixed(2)}L`).join('<br>')
+    :'記録なし';
+  document.getElementById('settlement-fuel-total').textContent=record.fuelTotal.toFixed(2)+'L';
+  document.getElementById('settlement-meter-end').textContent=record.meterEnd!=null?record.meterEnd.toLocaleString():'−';
+  document.getElementById('settlement-meter-start').textContent=record.meterStart!=null?record.meterStart.toLocaleString():'−';
+  document.getElementById('settlement-meter-diff').textContent=record.meterDiff!=null?record.meterDiff.toLocaleString():'−';
+  document.getElementById('settlement-revenue-before').textContent=fmtYen(record.revenueBeforeDiscount);
+  document.getElementById('settlement-discount').textContent=fmtYen(record.discountTotal);
+  document.getElementById('settlement-revenue-after').textContent=fmtYen(record.revenueAfterDiscount);
+  document.getElementById('settlement-credit').textContent=fmtYen(record.credit);
+  document.getElementById('settlement-emoney').textContent=fmtYen(record.emoney);
+  document.getElementById('settlement-ticket-label').textContent=`チケット${record.ticketCount}枚　福祉券${record.welfareCount}枚`;
+  document.getElementById('settlement-ticket').textContent=fmtYen(record.ticket);
+  document.getElementById('settlement-qr').textContent=fmtYen(record.qr);
+  document.getElementById('settlement-etc').textContent=fmtYen(settlementEtcDisplay(record));
+  document.getElementById('settlement-uncollected-input').value=record.uncollected||0;
+  updateSettlementTotalsDisplay(record);
+  openOverlay('settlement-report-modal');
+}
+function updateSettlementTotalsDisplay(record){
+  const {cashSettleTotal,paymentAmount}=computeSettlementTotals(record);
+  document.getElementById('settlement-cash-total').textContent=fmtYen(cashSettleTotal);
+  document.getElementById('settlement-payment-amount').textContent=fmtYen(paymentAmount);
+}
+function onSettlementFieldEdit(){
+  if(!currentSettlementRecord)return;
+  currentSettlementRecord.uncollected=parseInt(document.getElementById('settlement-uncollected-input').value)||0;
+  updateSettlementTotalsDisplay(currentSettlementRecord);
+}
+function closeSettlementReport(){
+  closeOverlay('settlement-report-modal');
+  currentSettlementRecord=null;
+}
+
+// ===== 初期化 =====
+window.addEventListener('load',()=>{
+  restoreRuntimeState();
+  applyDutyUI();
+});
+</script>
+</body>
+</html>
