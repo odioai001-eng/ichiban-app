@@ -175,23 +175,46 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
 <div class="overlay" id="settings-modal">
   <div class="modal">
     <h3>⚙️ 設定 <button class="mc" onclick="closeOverlay('settings-modal')">✕</button></h3>
-    <label>氏名</label>
-    <input type="text" id="s-name">
-    <label>車両番号</label>
-    <input type="text" id="s-car">
-    <label>ナンバー</label>
-    <input type="text" id="s-plate">
-    <div class="sec">目標設定</div>
-    <label>月の目標出勤日数</label>
-    <input type="number" inputmode="numeric" id="s-target-days" placeholder="例: 20">
-    <label>月の目標金額（円・税抜）</label>
-    <input type="number" inputmode="numeric" id="s-target-amount" placeholder="例: 900000">
-    <div class="sec">繰越（アプリ利用開始前の実績）</div>
-    <label>繰越売上（円・税抜）</label>
-    <input type="number" inputmode="numeric" id="s-carry-fare" placeholder="0">
-    <label>繰越出勤日数</label>
-    <input type="number" inputmode="numeric" id="s-carry-days" placeholder="0">
-    <button class="btn btn-p" style="width:100%;padding:12px" onclick="saveSettingsModal()">保存する</button>
+
+    <div class="sec">📅 勤務時間管理</div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">出勤・退勤時間の記録一覧です。押し間違い等があれば「編集」「削除」から直接修正できます。</div>
+      <label>今月の出勤予定日数</label>
+      <input type="number" inputmode="numeric" id="s-target-days" placeholder="例: 20">
+      <label>今月の目標金額（円）</label>
+      <input type="number" inputmode="numeric" id="s-target-amount" placeholder="例: 900000">
+      <button class="btn btn-p" style="width:100%" onclick="saveTargetSettings()">保存する</button>
+      <div id="work-stats-out" style="margin-top:10px"></div>
+      <div id="shift-entries-list" style="margin-top:10px"></div>
+    </div>
+
+    <div class="sec">💰 売上管理（税抜）</div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">日ごとの売上（税抜）の記録一覧です。「編集」「削除」から直接修正できます。</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px">
+        <button class="btn btn-g" onclick="changeSalesStatsMonth(-1)" style="font-size:11px;padding:5px 10px">◀ 前月</button>
+        <span id="sales-month-label" style="font-size:13px;font-weight:700;min-width:70px;text-align:center">今月</span>
+        <button class="btn btn-g" onclick="changeSalesStatsMonth(1)" id="sales-next-btn" style="font-size:11px;padding:5px 10px">次月 ▶</button>
+      </div>
+      <div id="fare-day-entries-list"></div>
+    </div>
+
+    <div class="sec">🧾 本日の納金額</div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">退勤のたびに自動で作成される精算表の一覧です。タップすると内容を再表示できます。</div>
+      <div id="settlement-log-list"></div>
+    </div>
+
+    <div class="sec">👤 出勤時に表示する氏名・車両</div>
+    <div class="card">
+      <label>氏名</label>
+      <input type="text" id="s-name">
+      <label>車両番号</label>
+      <input type="text" id="s-car">
+      <label>ナンバー</label>
+      <input type="text" id="s-plate">
+      <button class="btn btn-p" style="width:100%" onclick="saveDriverSettings()">保存する</button>
+    </div>
   </div>
 </div>
 
@@ -412,24 +435,28 @@ function openSettingsModal(){
   document.getElementById('s-plate').value=s.plate||'';
   document.getElementById('s-target-days').value=s.targetDays||'';
   document.getElementById('s-target-amount').value=s.targetAmount||'';
-  document.getElementById('s-carry-fare').value=s.carryFare||'';
-  document.getElementById('s-carry-days').value=s.carryDays||'';
+  salesStatsMonthOffset=0;
+  renderWorkStats();
+  renderSalesStats();
+  renderSettlementLogList();
   openOverlay('settings-modal');
 }
-function saveSettingsModal(){
-  const s={
-    name:document.getElementById('s-name').value.trim(),
-    car:document.getElementById('s-car').value.trim(),
-    plate:document.getElementById('s-plate').value.trim(),
-    targetDays:parseInt(document.getElementById('s-target-days').value)||0,
-    targetAmount:parseInt(document.getElementById('s-target-amount').value)||0,
-    carryFare:parseInt(document.getElementById('s-carry-fare').value)||0,
-    carryDays:parseInt(document.getElementById('s-carry-days').value)||0
-  };
+function saveTargetSettings(){
+  const s=loadSettings();
+  s.targetDays=parseInt(document.getElementById('s-target-days').value)||0;
+  s.targetAmount=parseInt(document.getElementById('s-target-amount').value)||0;
   saveSettings(s);
-  closeOverlay('settings-modal');
-  toast('✅ 設定を保存しました');
+  toast('✅ 保存しました');
+  renderWorkStats();
   renderStatsBar();
+}
+function saveDriverSettings(){
+  const s=loadSettings();
+  s.name=document.getElementById('s-name').value.trim();
+  s.car=document.getElementById('s-car').value.trim();
+  s.plate=document.getElementById('s-plate').value.trim();
+  saveSettings(s);
+  toast('✅ 保存しました');
 }
 
 // ===== 出退勤の状態 =====
@@ -541,14 +568,21 @@ function confirmEndDuty(){
   const shiftEndTs=endDate.getTime();
   const record=buildSettlementRecord(shiftStartTs,shiftEndTs,dutyStartMeter,meterVal,fuelEntries,highwayEntries,jibaraHighwayEntries);
   const shiftLog=JSON.parse(localStorage.getItem('sa_shift_log')||'[]');
-  shiftLog.push({dateStr:record.dateStr,startTs:shiftStartTs,endTs:shiftEndTs,meterStart:dutyStartMeter,meterEnd:meterVal});
+  // 実際の出退勤の間隔に加え、着替え・点呼等の分として+30分を勤務時間の実績に
+  // 加算する（仲間アプリの退勤処理と同じ慣例）
+  const durationSec=Math.floor((shiftEndTs-shiftStartTs)/1000)+1800;
+  shiftLog.push({dateStr:record.dateStr,startTs:shiftStartTs,endTs:shiftEndTs,durationSec,meterStart:dutyStartMeter,meterEnd:meterVal});
   localStorage.setItem('sa_shift_log',JSON.stringify(shiftLog));
+  const settlementLog=JSON.parse(localStorage.getItem('sa_settlement_log')||'[]');
+  settlementLog.push(record);
+  localStorage.setItem('sa_settlement_log',JSON.stringify(settlementLog));
+  const settlementIndex=settlementLog.length-1;
   isDuty=false;dutyStart=null;dutyStartMeter=null;planFinishTs=null;
   fuelEntries=[];highwayEntries=[];jibaraHighwayEntries=[];
   localStorage.removeItem('sa_runtime_state');
   closeOverlay('duty-end-modal');
   applyDutyUI();
-  showSettlementReport(record);
+  showSettlementReport(record,settlementIndex);
 }
 
 // ===== GAS・高速代の記録 =====
@@ -846,6 +880,207 @@ function renderStatsBar(){
   }
 }
 
+// ===== 設定タブ：勤務時間管理 =====
+const MONTHLY_TARGET_HOURS=288;
+const FINAL_DAY_RESERVE_HOURS=15;
+function hoursToHM(hours){
+  const h=Math.floor(hours);
+  const m=Math.round((hours-h)*60);
+  return `${h}時間${m}分`;
+}
+function renderWorkStats(){
+  const out=document.getElementById('work-stats-out');
+  if(!out)return;
+  const s=loadSettings();
+  const targetDays=s.targetDays||0;
+  const shifts=getMonthShifts();
+  const workedDays=shifts.length;
+  const workedSec=shifts.reduce((a,sh)=>a+(sh.durationSec||0),0);
+  let workedHours=workedSec/3600;
+  // 出勤中はまだsa_shift_logに記録が無い（退勤して確定するまで記録されない）ため、
+  // 今回のシフトの経過時間もここで加算しておく（出勤日数のカウントは退勤して
+  // 1日分として確定するまでは増やさない）
+  if(isDuty&&dutyStart)workedHours+=(Date.now()-dutyStart.getTime())/3600000;
+  const remainDays=Math.max(targetDays-workedDays,0);
+  const remainHoursGap=Math.max(MONTHLY_TARGET_HOURS-workedHours,0);
+  let perDayStr='-';
+  let remainHoursRaw=remainHoursGap;
+  if(remainDays>0){
+    remainHoursRaw=Math.max(remainHoursGap-remainDays*0.5,0);
+    const perDayHours=remainDays>1?Math.max(remainHoursRaw-FINAL_DAY_RESERVE_HOURS,0)/(remainDays-1):remainHoursRaw;
+    perDayStr=hoursToHM(perDayHours);
+  }
+  out.innerHTML=`
+    <div class="row2"><span class="rl">今月の実績</span><span class="rv">${workedDays}日 / ${hoursToHM(workedHours)}</span></div>
+    <div class="row2"><span class="rl">残り出勤日数</span><span class="rv">${remainDays}日</span></div>
+    <div class="row2"><span class="rl">残り営業時間</span><span class="rv">${hoursToHM(remainHoursRaw)}</span></div>
+    <div class="row2"><span class="rl">1日あたり目安</span><span class="rv" style="color:var(--gold);font-weight:800">${perDayStr}</span></div>
+  `;
+  renderShiftEntries();
+}
+function renderShiftEntries(){
+  const el=document.getElementById('shift-entries-list');
+  if(!el)return;
+  const shifts=getMonthShifts().slice().sort((a,b)=>b.startTs-a.startTs);
+  if(!shifts.length){el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0">今月の記録はありません</div>';return;}
+  el.innerHTML=shifts.map(s=>{
+    const totalMin=Math.round((s.durationSec||0)/60);
+    const hStr=`${Math.floor(totalMin/60)}時間${totalMin%60}分`;
+    const startStr=fmtHM(s.startTs);
+    const endStr=s.endTs?fmtHM(s.endTs):'-';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;font-size:12px">
+        <span style="color:var(--muted)">${s.dateStr}</span>
+        <span style="font-weight:700;color:var(--gold);margin-left:6px">${hStr}</span>
+        <div style="margin-top:2px"><span style="color:var(--green)">🟢 ${startStr}</span> <span style="color:var(--muted)">→</span> <span style="color:var(--red)">🔴 ${endStr}</span></div>
+      </div>
+      <button onclick="editShiftEntry(${s.startTs})" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--accent);cursor:pointer">編集</button>
+      <button onclick="deleteShiftEntry(${s.startTs})" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--red);cursor:pointer">削除</button>
+    </div>`;
+  }).join('');
+}
+function editShiftEntry(startTs){
+  const log=JSON.parse(localStorage.getItem('sa_shift_log')||'[]');
+  const idx=log.findIndex(s=>s.startTs===startTs);
+  if(idx<0)return;
+  const cur=log[idx];
+  const curStartDate=new Date(cur.startTs);
+  const curStartStr=fmtHM(cur.startTs);
+  const curEndStr=cur.endTs?fmtHM(cur.endTs):'';
+  const newStartVal=prompt(`出勤時刻（${cur.dateStr}、例: 09:00）`,curStartStr);
+  if(newStartVal===null)return;
+  const newEndVal=prompt('退勤時刻（例: 21:30。出勤時刻より前の場合は翌日扱いにします）',curEndStr);
+  if(newEndVal===null)return;
+  const sm=newStartVal.trim().match(/^(\d{1,2}):(\d{2})$/);
+  const em=newEndVal.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if(!sm||!em){toast('⚠️ 時刻はHH:MM形式で入力してください');return;}
+  const y=curStartDate.getFullYear(),mo=curStartDate.getMonth(),d=curStartDate.getDate();
+  const newStartTs=new Date(y,mo,d,parseInt(sm[1],10),parseInt(sm[2],10),0).getTime();
+  let newEndTs=new Date(y,mo,d,parseInt(em[1],10),parseInt(em[2],10),0).getTime();
+  if(newEndTs<=newStartTs)newEndTs+=24*3600*1000;
+  log[idx].startTs=newStartTs;
+  log[idx].endTs=newEndTs;
+  log[idx].durationSec=Math.floor((newEndTs-newStartTs)/1000)+1800;
+  log[idx].dateStr=new Date(newStartTs).toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});
+  localStorage.setItem('sa_shift_log',JSON.stringify(log));
+  toast('✅ 記録を更新しました');
+  renderWorkStats();
+  renderSalesStats();
+}
+function deleteShiftEntry(startTs){
+  if(!confirm('この勤務記録を削除しますか？'))return;
+  let log=JSON.parse(localStorage.getItem('sa_shift_log')||'[]');
+  log=log.filter(s=>s.startTs!==startTs);
+  localStorage.setItem('sa_shift_log',JSON.stringify(log));
+  toast('🗑 記録を削除しました');
+  renderWorkStats();
+  renderSalesStats();
+}
+
+// ===== 設定タブ：売上管理（税抜） =====
+// 「勤務時間管理」と同じ形式（1回の勤務ごとに1行・編集/削除できる）で売上を
+// 確認できるよう、月内のsa_fare_logを勤務（出勤〜退勤）ごとに合算する。
+// どの勤務にも属さない記録（勤務記録の無い日の手動修正分）だけ、暦日でまとめる
+function getMonthFareDays(offset){
+  offset=offset||0;
+  const log=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
+  const now=new Date();
+  const monthStart=new Date(now.getFullYear(),now.getMonth()+offset,1).getTime();
+  const monthEnd=new Date(now.getFullYear(),now.getMonth()+offset+1,1).getTime();
+  const shiftLog=JSON.parse(localStorage.getItem('sa_shift_log')||'[]').filter(s=>s.startTs>=monthStart&&s.startTs<monthEnd&&s.endTs);
+  const used=new Set();
+  const groups=shiftLog.map(s=>{
+    const inShift=log.filter(e=>(e.ts||0)>=s.startTs&&(e.ts||0)<=s.endTs);
+    inShift.forEach(e=>used.add(e));
+    return {dateStr:s.dateStr,fare:inShift.reduce((a,e)=>a+(e.fare||0),0),
+      toll:0,ts:s.startTs,tsRange:{start:s.startTs,end:s.endTs}};
+  });
+  // 出勤中でまだ退勤していない今回のシフトの記録は、退勤して本来のシフト期間で
+  // 1本にまとまるまでここでは除外する（メイン画面の「本日の売上」に別途表示される）
+  if(isDuty&&dutyStart){
+    log.filter(e=>(e.ts||0)>=dutyStart.getTime()).forEach(e=>used.add(e));
+  }
+  const byDate={};
+  log.filter(e=>(e.ts||0)>=monthStart&&(e.ts||0)<monthEnd&&!used.has(e)).forEach(e=>{
+    const key=e.dateStr;
+    if(!byDate[key])byDate[key]={dateStr:key,fare:0,toll:0,ts:e.ts||0,tsRange:null};
+    byDate[key].fare+=(e.fare||0);
+    byDate[key].ts=Math.max(byDate[key].ts,e.ts||0);
+  });
+  return groups.concat(Object.values(byDate));
+}
+let salesStatsMonthOffset=0;
+function changeSalesStatsMonth(delta){
+  const next=salesStatsMonthOffset+delta;
+  if(next>0)return;
+  salesStatsMonthOffset=next;
+  renderSalesStats();
+}
+function salesStatsMonthLabel(offset){
+  if(offset===0)return '今月';
+  const now=new Date();
+  const d=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  return `${d.getFullYear()}年${d.getMonth()+1}月`;
+}
+function renderSalesStats(){
+  const lbl=document.getElementById('sales-month-label');
+  if(lbl)lbl.textContent=salesStatsMonthLabel(salesStatsMonthOffset);
+  const nextBtn=document.getElementById('sales-next-btn');
+  if(nextBtn)nextBtn.disabled=salesStatsMonthOffset>=0;
+  renderFareDayEntries();
+}
+function renderFareDayEntries(){
+  const el=document.getElementById('fare-day-entries-list');
+  if(!el)return;
+  const monthLabel=salesStatsMonthLabel(salesStatsMonthOffset);
+  const days=getMonthFareDays(salesStatsMonthOffset).sort((a,b)=>b.ts-a.ts);
+  if(!days.length){el.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:6px 0">${monthLabel}の記録はありません</div>`;return;}
+  el.innerHTML=days.map(d=>{
+    const rangeStr=d.tsRange
+      ?` <span style="color:var(--muted)">(🟢${fmtHM(d.tsRange.start)}→🔴${fmtHM(d.tsRange.end)})</span>`
+      :'';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;font-size:12px">
+        <span style="color:var(--muted)">${d.dateStr}</span>${rangeStr}
+        <div style="margin-top:2px"><span style="font-weight:700;color:var(--green)">¥${exTax(d.fare).toLocaleString()}</span></div>
+      </div>
+      <button onclick="editFareDayEntry(${d.ts})" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--accent);cursor:pointer">編集</button>
+      <button onclick="deleteFareDayEntry(${d.ts})" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--red);cursor:pointer">削除</button>
+    </div>`;
+  }).join('');
+}
+// その勤務（またはその日）の売上（税込・合算）を編集する。対象範囲の既存エントリを
+// すべて1件にまとめ直すことで、個々の乗車記録の内訳ではなく合計として上書きする
+async function editFareDayEntry(ts){
+  const g=getMonthFareDays(salesStatsMonthOffset).find(d=>d.ts===ts);
+  if(!g)return;
+  const newFareExTax=await promptNumber(`${g.dateStr} の売上合計（円・税抜）`,exTax(g.fare));
+  if(newFareExTax===null)return;
+  let log=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
+  log=g.tsRange
+    ?log.filter(e=>!((e.ts||0)>=g.tsRange.start&&(e.ts||0)<=g.tsRange.end))
+    :log.filter(e=>e.dateStr!==g.dateStr);
+  const newFare=Math.round((parseInt(newFareExTax)||0)*1.1);
+  log.push({dateStr:g.dateStr,fare:newFare,ts:g.ts,manual:true});
+  localStorage.setItem('sa_fare_log',JSON.stringify(log));
+  toast('✅ 記録を更新しました');
+  renderSalesStats();
+  renderStatsBar();
+}
+function deleteFareDayEntry(ts){
+  const g=getMonthFareDays(salesStatsMonthOffset).find(d=>d.ts===ts);
+  if(!g)return;
+  if(!confirm(`${g.dateStr}の売上記録を削除しますか？`))return;
+  let log=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
+  log=g.tsRange
+    ?log.filter(e=>!((e.ts||0)>=g.tsRange.start&&(e.ts||0)<=g.tsRange.end))
+    :log.filter(e=>e.dateStr!==g.dateStr);
+  localStorage.setItem('sa_fare_log',JSON.stringify(log));
+  toast('🗑 削除しました');
+  renderSalesStats();
+  renderStatsBar();
+}
+
 // ===== 日次精算 =====
 function buildSettlementRecord(shiftStartTs,shiftEndTs,meterStart,meterEnd,fuelEntriesArg,highwayEntriesArg,jibaraHighwayEntriesArg){
   const fareLog=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
@@ -898,8 +1133,10 @@ function computeSettlementTotals(record){
   return {cashSettleTotal,paymentAmount};
 }
 let currentSettlementRecord=null;
-function showSettlementReport(record){
+let currentSettlementIndex=-1;
+function showSettlementReport(record,index){
   currentSettlementRecord=record;
+  currentSettlementIndex=(index!=null)?index:-1;
   document.getElementById('settlement-date-label').textContent=record.dateStr;
   document.getElementById('settlement-fuel-rows').innerHTML=record.fuelEntries.length
     ?record.fuelEntries.map(e=>`${fmtHM(e.ts)}　${e.amount.toFixed(2)}L`).join('<br>')
@@ -930,10 +1167,56 @@ function onSettlementFieldEdit(){
   if(!currentSettlementRecord)return;
   currentSettlementRecord.uncollected=parseInt(document.getElementById('settlement-uncollected-input').value)||0;
   updateSettlementTotalsDisplay(currentSettlementRecord);
+  if(currentSettlementIndex>=0){
+    const settlementLog=JSON.parse(localStorage.getItem('sa_settlement_log')||'[]');
+    if(settlementLog[currentSettlementIndex]){
+      settlementLog[currentSettlementIndex]=currentSettlementRecord;
+      localStorage.setItem('sa_settlement_log',JSON.stringify(settlementLog));
+    }
+  }
+}
+function openSettlementFromLog(index){
+  const settlementLog=JSON.parse(localStorage.getItem('sa_settlement_log')||'[]');
+  const r=settlementLog[index];
+  if(!r)return;
+  showSettlementReport(r,index);
+}
+function deleteSettlementLogEntry(index){
+  const settlementLog=JSON.parse(localStorage.getItem('sa_settlement_log')||'[]');
+  const r=settlementLog[index];
+  if(!r)return;
+  if(!confirm(`${r.dateStr||'この日'}の精算記録を削除しますか？`))return;
+  settlementLog.splice(index,1);
+  localStorage.setItem('sa_settlement_log',JSON.stringify(settlementLog));
+  renderSettlementLogList();
+  toast('🗑 精算記録を削除しました');
+}
+function renderSettlementLogList(){
+  const el=document.getElementById('settlement-log-list');
+  if(!el)return;
+  const settlementLog=JSON.parse(localStorage.getItem('sa_settlement_log')||'[]');
+  if(!settlementLog.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:6px 0">まだ記録がありません</div>';
+    return;
+  }
+  const order=settlementLog.map((r,i)=>i).sort((a,b)=>settlementLog[b].shiftStartTs-settlementLog[a].shiftStartTs);
+  el.innerHTML=order.map(i=>{
+    const r=settlementLog[i];
+    const {paymentAmount}=computeSettlementTotals(r);
+    return `<div onclick="openSettlementFromLog(${i})" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <div style="flex:1;font-size:12px">
+        <span style="color:var(--muted)">${r.dateStr||''}</span>
+        <span style="font-weight:700;color:var(--gold);margin-left:6px">${fmtYen(paymentAmount)}</span>
+      </div>
+      <button onclick="event.stopPropagation();deleteSettlementLogEntry(${i})" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:10px;color:var(--red);cursor:pointer;flex-shrink:0">🗑削除</button>
+      <span style="font-size:11px;color:var(--muted)">▶</span>
+    </div>`;
+  }).join('');
 }
 function closeSettlementReport(){
   closeOverlay('settlement-report-modal');
   currentSettlementRecord=null;
+  currentSettlementIndex=-1;
 }
 
 // ===== 初期化 =====
