@@ -176,6 +176,12 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
   <div class="modal">
     <h3>⚙️ 設定 <button class="mc" onclick="closeOverlay('settings-modal')">✕</button></h3>
 
+    <div class="sec">🧾 本日の納金額</div>
+    <div class="card">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">退勤のたびに自動で作成される精算表の一覧です。タップすると内容を再表示できます。</div>
+      <div id="settlement-log-list"></div>
+    </div>
+
     <div class="sec">📅 勤務時間管理</div>
     <div class="card">
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">出勤・退勤時間の記録一覧です。押し間違い等があれば「編集」「削除」から直接修正できます。</div>
@@ -197,12 +203,6 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
         <button class="btn btn-g" onclick="changeSalesStatsMonth(1)" id="sales-next-btn" style="font-size:11px;padding:5px 10px">次月 ▶</button>
       </div>
       <div id="fare-day-entries-list"></div>
-    </div>
-
-    <div class="sec">🧾 本日の納金額</div>
-    <div class="card">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">退勤のたびに自動で作成される精算表の一覧です。タップすると内容を再表示できます。</div>
-      <div id="settlement-log-list"></div>
     </div>
 
     <div class="sec">👤 出勤時に表示する氏名・車両</div>
