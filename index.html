@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<!-- v1 -->
+<!-- v2 -->
 <title>🫰売上時間管理アプリ</title>
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
@@ -43,10 +43,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sa
 .stats-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
   box-sizing:border-box;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));
   background:var(--surface);border-top:1px solid var(--border);
-  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;z-index:1000}
+  display:grid;grid-template-columns:repeat(4,1fr);gap:4px 6px;z-index:1000}
 .stat-cell{text-align:center}
-.stat-label{font-size:10px;color:var(--muted);margin-bottom:2px;white-space:nowrap}
-.stat-value{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat-label{font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap}
+.stat-value{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
 .stat-value.gold{color:var(--gold)}
 .stat-value.amber{color:var(--amber)}
 .stat-value.cyan{color:var(--cyan)}
@@ -127,9 +127,11 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
   <div class="stat-cell"><div class="stat-label">本日の出勤時間</div><div class="stat-value" id="stat-start">-</div></div>
   <div class="stat-cell"><div class="stat-label">本日の上がり予定</div><div class="stat-value" id="stat-finish">-</div></div>
   <div class="stat-cell"><div class="stat-label">本日の目標</div><div class="stat-value gold" id="stat-target">¥0</div></div>
+  <div class="stat-cell"><div class="stat-label">目標時間単価</div><div class="stat-value gold" id="stat-target-hourly">-</div></div>
   <div class="stat-cell"><div class="stat-label">本日の売上</div><div class="stat-value green" id="stat-sales">¥0</div></div>
   <div class="stat-cell"><div class="stat-label">本日の残り時間</div><div class="stat-value amber" id="stat-remain">-</div></div>
   <div class="stat-cell"><div class="stat-label">目標まであと</div><div class="stat-value cyan" id="stat-target-left">¥0</div></div>
+  <div class="stat-cell"><div class="stat-label">現在時間単価</div><div class="stat-value amber" id="stat-current-hourly">-</div></div>
 </div>
 
 <!-- 出勤：時刻・メーター・上がり予定 -->
@@ -879,6 +881,23 @@ function renderStatsBar(){
     document.getElementById('stat-remain').textContent=toHMS(remainSec);
   }else{
     document.getElementById('stat-remain').textContent='-';
+  }
+  // 目標時間単価＝本日の目標金額 ÷ 出勤時に設定した本日の予定労働時間
+  const targetHourlyEl=document.getElementById('stat-target-hourly');
+  if(isDuty&&dutyStart&&planFinishTs&&dailyTarget>0){
+    const planHours=(planFinishTs-dutyStart.getTime())/3600000;
+    targetHourlyEl.textContent=planHours>0?fmtYen(Math.round(dailyTarget/planHours)):'-';
+  }else{
+    targetHourlyEl.textContent='-';
+  }
+  // 現在時間単価＝出勤からの経過時間で、本日の売上（確定済み）を割った金額。
+  // 出勤直後は分母が小さすぎて金額が跳ね上がるため、1分未満の間は表示しない
+  const currentHourlyEl=document.getElementById('stat-current-hourly');
+  if(isDuty&&dutyStart){
+    const elapsedHours=(Date.now()-dutyStart.getTime())/3600000;
+    currentHourlyEl.textContent=elapsedHours>=(1/60)?fmtYen(Math.round(todaySales/elapsedHours)):'-';
+  }else{
+    currentHourlyEl.textContent='-';
   }
 }
 
