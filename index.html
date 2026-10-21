@@ -53,6 +53,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sa
 .stat-value.amber{color:var(--amber)}
 .stat-value.cyan{color:var(--cyan)}
 .stat-value.green{color:var(--green)}
+.stat-value.red{color:var(--red)}
 .sec{font-size:11px;font-weight:700;color:var(--muted);margin:14px 0 8px;
   text-transform:uppercase;letter-spacing:.8px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
@@ -971,11 +972,17 @@ function renderStatsBar(){
     :0;
   document.getElementById('stat-target').textContent=fmtYen(dailyTarget);
   document.getElementById('stat-target-left').textContent=fmtYen(Math.max(dailyTarget-todaySales,0));
+  // 上がり予定時刻を過ぎたら、0のまま止めずに「オーバー」と赤字で知らせる
+  const remainEl=document.getElementById('stat-remain');
   if(isDuty&&planFinishTs){
-    const remainSec=Math.max(0,Math.floor((planFinishTs-Date.now())/1000));
-    document.getElementById('stat-remain').textContent=toHMS(remainSec);
+    const remainSec=Math.floor((planFinishTs-Date.now())/1000);
+    const over=remainSec<=0;
+    remainEl.textContent=over?'オーバー':toHMS(remainSec);
+    remainEl.classList.toggle('red',over);
+    remainEl.classList.toggle('amber',!over);
   }else{
-    document.getElementById('stat-remain').textContent='-';
+    remainEl.textContent='-';
+    remainEl.classList.remove('red');remainEl.classList.add('amber');
   }
   // 目標時間単価＝本日の目標金額 ÷ 出勤時に設定した本日の予定労働時間
   const targetHourlyEl=document.getElementById('stat-target-hourly');
