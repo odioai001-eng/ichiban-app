@@ -74,7 +74,11 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
   gap:4px;padding:12px 4px;border-radius:12px;font-size:11px;font-weight:700;line-height:1.3}
 .action-btn .ic{font-size:22px}
 /* 運賃入力が主役なので、自腹高速・無料高速・GASは運賃入力の1/4の高さにする */
-.action-btn.main{height:76px}
+/* 運賃入力は一番よく押すボタンなので、横幅いっぱい・大きな文字・明るいグラデーションで目立たせる */
+.action-btn.main{height:76px;grid-column:1/-1;flex-direction:row;gap:10px;font-size:22px;font-weight:800;
+  letter-spacing:2px;border-radius:14px;background:linear-gradient(135deg,#3b82f6 0%,#06b6d4 100%);
+  box-shadow:0 4px 16px rgba(59,130,246,.45),inset 0 1px 0 rgba(255,255,255,.25)}
+.action-btn.main .ic{font-size:32px}
 .action-btn.half{height:19px;flex-direction:row;gap:2px;padding:0 2px;border-radius:6px;font-size:10px;line-height:1}
 .action-btn.half .ic{font-size:10px}
 .fare-pay-btn{padding:10px 4px;border-radius:10px;border:2px solid var(--accent);
@@ -118,7 +122,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
 
 <div class="page" id="page-main">
   <div class="pc">
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px;align-items:start">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px;align-items:start">
       <button class="btn btn-p action-btn main" onclick="openFareModal()"><span class="ic">💰</span>運賃入力</button>
       <button class="btn btn-g action-btn half" onclick="promptJibaraHighwayEntry()"><span class="ic">🛣</span>自腹高速</button>
       <button class="btn btn-g action-btn half" onclick="promptHighwayEntry()"><span class="ic">🛣</span>無料高速</button>
