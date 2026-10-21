@@ -32,8 +32,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sa
   background:var(--surface);border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;padding-left:14px;padding-right:14px;z-index:1000}
 .hdr-title{font-size:14px;font-weight:700;letter-spacing:.3px;line-height:1.15}
+.hdr-left{display:flex;align-items:center;gap:6px;min-width:0}
 .hdr-right{display:flex;align-items:center;gap:8px}
-.gear-btn{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px}
+.gear-btn{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 4px 4px 0;flex-shrink:0}
 .duty-btn{padding:6px 13px;border-radius:20px;border:none;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
 .duty-btn.on{background:var(--green);color:#fff}
 .duty-btn.off{background:var(--red);color:#fff}
@@ -117,9 +118,12 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
 <body>
 
 <div class="hdr">
-  <div class="hdr-title">【<img src="icon.png" alt="" style="width:16px;height:16px;vertical-align:-3px">売上時間管理アプリ】</div>
-  <div class="hdr-right">
+  <!-- ⚙️は退勤ボタンを誤って押さないよう、反対側（左端）に置く -->
+  <div class="hdr-left">
     <button class="gear-btn" onclick="openSettingsModal()">⚙️</button>
+    <div class="hdr-title">【<img src="icon.png" alt="" style="width:16px;height:16px;vertical-align:-3px">売上時間管理アプリ】</div>
+  </div>
+  <div class="hdr-right">
     <button class="duty-btn off" id="duty-btn" onclick="toggleDuty()">出勤する</button>
   </div>
 </div>
