@@ -20,7 +20,7 @@
   --bg:#0d0d1a;--surface:#161628;--surface2:#1e1e35;--border:#2a2a4a;
   --text:#e8e8f4;--muted:#7878a0;--accent:#4f8ef7;
   --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--purple:#a855f7;--cyan:#06b6d4;
-  --gold:#fbbf24;--hh:54px;--sh:92px;
+  --gold:#fbbf24;--hh:54px;--sh:148px;
 }
 *{box-sizing:border-box}
 html,body{height:100%;height:100dvh;overflow:hidden}
@@ -41,12 +41,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sa
   width:100%;max-width:480px;bottom:calc(var(--sh) + env(safe-area-inset-bottom,0px));overflow-y:auto}
 .pc{padding:12px}
 .stats-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
-  box-sizing:border-box;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));
+  box-sizing:border-box;padding:16px 4px calc(16px + env(safe-area-inset-bottom,0px));
   background:var(--surface);border-top:1px solid var(--border);
-  display:grid;grid-template-columns:repeat(4,1fr);gap:4px 6px;z-index:1000}
-.stat-cell{text-align:center}
-.stat-label{font-size:9px;color:var(--muted);margin-bottom:2px;white-space:nowrap}
-.stat-value{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+  display:grid;grid-template-columns:repeat(4,1fr);gap:16px 2px;align-content:center;z-index:1000;
+  height:calc(var(--sh) + env(safe-area-inset-bottom,0px))}
+.stat-cell{text-align:center;min-width:0}
+.stat-label{font-size:clamp(9.5px,3vw,13px);color:var(--muted);margin-bottom:4px;white-space:nowrap;letter-spacing:-.3px}
+.stat-value{font-size:clamp(15px,4.6vw,22px);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:-.3px}
 .stat-value.gold{color:var(--gold)}
 .stat-value.amber{color:var(--amber)}
 .stat-value.cyan{color:var(--cyan)}
@@ -89,6 +90,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
 .entry-sub{font-size:11px;color:var(--muted);margin-top:2px}
 .entry-amount{font-size:14px;font-weight:800;color:var(--green);white-space:nowrap}
 .entry-del{background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:4px}
+.entry-edit{background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;padding:4px}
 .toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);
   background:rgba(30,30,60,.95);color:#fff;padding:7px 18px;border-radius:20px;
   font-size:13px;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;
@@ -229,7 +231,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
 <!-- 運賃入力 -->
 <div class="overlay" id="fare-modal">
   <div class="modal" style="max-width:340px;margin:0 auto">
-    <h3>💰 運賃を入力 <button class="mc" onclick="skipFareModal()">✕</button></h3>
+    <h3><span id="fare-modal-title">💰 運賃を入力</span> <button class="mc" onclick="skipFareModal()">✕</button></h3>
     <div style="margin-bottom:16px">
       <div style="font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600">運賃（円・税込）</div>
       <input id="fare-input" type="number" inputmode="numeric" placeholder="例: 3200">
@@ -276,7 +278,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
       <input id="fare-split-amount-input" type="number" inputmode="numeric" placeholder="内訳の金額" style="margin-bottom:8px">
       <div id="fare-split-list" style="display:flex;flex-direction:column;gap:4px"></div>
     </div>
-    <button onclick="confirmFareModal()" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">✅ 登録する</button>
+    <button id="fare-confirm-btn" onclick="confirmFareModal()" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">✅ 登録する</button>
     <button onclick="skipFareModal()" style="width:100%;padding:11px;border:2px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font-size:13px;font-weight:700;cursor:pointer">キャンセル</button>
   </div>
 </div>
@@ -394,10 +396,12 @@ function toHMS(sec){
 function todayDateStr(d){return (d||new Date()).toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});}
 
 // ===== 数字入力キーパッド（汎用） =====
-let numKeypadResolve=null;
+let numKeypadResolve=null,numKeypadFresh=false;
 function promptNumber(title,defaultValue,allowDecimal){
   return new Promise(resolve=>{
     numKeypadResolve=resolve;
+    // 今の値を表示して開いた時は、最初の数字で入れ直しになる（後ろに付け足されないように）
+    numKeypadFresh=true;
     document.getElementById('num-keypad-title-text').textContent=String(title||'').replace(/\n/g,' ');
     const dv=(defaultValue!==undefined&&defaultValue!==null&&defaultValue!=='')?String(defaultValue):'0';
     document.getElementById('num-keypad-display').textContent=dv;
@@ -407,7 +411,8 @@ function promptNumber(title,defaultValue,allowDecimal){
 }
 function numKeypadPress(ch){
   const disp=document.getElementById('num-keypad-display');
-  let cur=disp.textContent==='0'?'':disp.textContent;
+  let cur=(disp.textContent==='0'||numKeypadFresh)?'':disp.textContent;
+  numKeypadFresh=false;
   if(ch==='.'){
     if(cur.includes('.'))return;
     cur=(cur||'0')+'.';
@@ -418,6 +423,7 @@ function numKeypadPress(ch){
   disp.textContent=cur||'0';
 }
 function numKeypadBackspace(){
+  numKeypadFresh=false;
   const disp=document.getElementById('num-keypad-display');
   disp.textContent=disp.textContent.slice(0,-1)||'0';
 }
@@ -630,6 +636,21 @@ async function promptJibaraHighwayEntry(){
   toast(`🛣️ ¥${amount.toLocaleString()} を記録しました（本日計 ¥${jibaraHighwayTotalYen().toLocaleString()}）`);
   renderEntriesList();
 }
+// 燃料・無料高速・自腹高速は金額（量）だけを訂正する。記録した時刻はそのまま
+async function editSimpleEntry(list,ts,title,isFuel){
+  const e=list.find(x=>x.ts===ts);
+  if(!e)return;
+  const val=await promptNumber(title+'を訂正',e.amount,isFuel);
+  if(val===null)return;
+  const amount=isFuel?Math.round((parseFloat(val)||0)*100)/100:(parseInt(val)||0);
+  if(amount<=0){toast('⚠️ 正しい数値を入力してください（消す場合は「削除」）');return;}
+  e.amount=amount;
+  saveRuntimeState();renderEntriesList();
+  toast('✏️ '+title+'を '+(isFuel?amount.toFixed(2)+'L':'¥'+amount.toLocaleString())+' に訂正しました');
+}
+function editFuelEntry(ts){editSimpleEntry(fuelEntries,ts,'給油量（リットル）',true);}
+function editHighwayEntry(ts){editSimpleEntry(highwayEntries,ts,'無料高速（円）',false);}
+function editJibaraEntry(ts){editSimpleEntry(jibaraHighwayEntries,ts,'自腹高速（円）',false);}
 function deleteFuelEntry(ts){
   fuelEntries=fuelEntries.filter(e=>e.ts!==ts);
   saveRuntimeState();renderEntriesList();toast('🗑 削除しました');
@@ -649,8 +670,16 @@ let fareSplitMode=false,fareSplitEntries=[];
 function paymentMethodLabel(method){
   return {cash:'現金',credit:'クレジット',emoney:'電子マネー',ticket:'チケット',qr:'QRコード',welfare:'福祉券'}[method]||method;
 }
+// 訂正中の運賃の時刻（ts）。nullなら新規入力。分割払いは同じtsで2件保存されるため、
+// 訂正時はそのtsの記録をまとめて置き換える
+let editingFareTs=null;
+function setFareModalMode(editing){
+  document.getElementById('fare-modal-title').textContent=editing?'✏️ 運賃を訂正':'💰 運賃を入力';
+  document.getElementById('fare-confirm-btn').textContent=editing?'✅ 訂正する':'✅ 登録する';
+}
 function openFareModal(){
   if(!isDuty){toast('⚠️ 出勤中のみ記録できます');return;}
+  editingFareTs=null;setFareModalMode(false);
   document.getElementById('fare-input').value='';
   document.getElementById('fare-etc-input').value='0';
   document.getElementById('fare-etc-diff-method-check').checked=false;
@@ -666,7 +695,41 @@ function openFareModal(){
   updateFarePaymentButtonsUI();updateFareEtcMethodButtonsUI();
   openOverlay('fare-modal');
 }
-function skipFareModal(){closeOverlay('fare-modal');}
+function skipFareModal(){editingFareTs=null;closeOverlay('fare-modal');}
+function editFareEntry(ts){
+  const entries=JSON.parse(localStorage.getItem('sa_fare_log')||'[]').filter(e=>e.ts===ts);
+  if(!entries.length)return;
+  openFareModal();
+  editingFareTs=ts;setFareModalMode(true);
+  const first=entries[0];
+  const total=entries.reduce((a,e)=>a+(e.fare||0),0);
+  const etc=entries.reduce((a,e)=>a+(e.etc||0),0);
+  const discount=entries.reduce((a,e)=>a+(e.discount||0),0);
+  const etcMethod=entries.map(e=>e.etcPaymentMethod).find(Boolean)||null;
+  document.getElementById('fare-input').value=total;
+  document.getElementById('fare-etc-input').value=etc;
+  if(etcMethod){
+    document.getElementById('fare-etc-diff-method-check').checked=true;
+    document.getElementById('fare-etc-method-wrap').style.display='block';
+    pendingEtcPaymentMethod=etcMethod;
+  }
+  if(discount){
+    document.getElementById('fare-discount-check').checked=true;
+    document.getElementById('fare-discount-wrap').style.display='block';
+    document.getElementById('fare-discount-input').value=discount;
+  }
+  if(entries.length>1){
+    // 分割払いだった記録は、分割の内訳ごと復元する
+    toggleFareSplitMode();
+    fareSplitEntries=entries.map(e=>({method:e.paymentMethod,amount:e.fare||0,welfareSheets:e.welfareSheets||0}));
+    renderFareSplitList();
+    document.getElementById('fare-split-amount-input').value='';
+  }else{
+    selectedFarePaymentMethod=first.paymentMethod||null;
+    pendingWelfareSheets=first.welfareSheets||0;
+  }
+  updateFarePaymentButtonsUI();updateFareEtcMethodButtonsUI();
+}
 function toggleFareEtcMethodInput(){
   const checked=document.getElementById('fare-etc-diff-method-check').checked;
   document.getElementById('fare-etc-method-wrap').style.display=checked?'block':'none';
@@ -759,17 +822,27 @@ function confirmFareModal(){
     if(fareSplitEntries.length<2){toast('⚠️ 分割する支払い方法を2つとも割り当ててください');return;}
     const used=fareSplitEntries.reduce((a,e)=>a+e.amount,0);
     if(used!==fare){toast(`⚠️ 内訳の合計（¥${used.toLocaleString()}）が運賃（¥${fare.toLocaleString()}）と一致しません`);return;}
-    const tripTs=Date.now();
+    const tripTs=editingFareTs||Date.now();
+    removeFareEntriesAt(editingFareTs);
     fareSplitEntries.forEach((e,i)=>{
       saveFareEntry(e.amount,tripTs,e.method,i===0?discount:0,i===0?etc:0,e.method==='welfare'?e.welfareSheets:0,i===0?etcPaymentMethod:null);
     });
+    editingFareTs=null;
     closeOverlay('fare-modal');
     return;
   }
   if(!selectedFarePaymentMethod){toast('⚠️ 支払い方法を選択してください');return;}
   const welfareSheets=selectedFarePaymentMethod==='welfare'?pendingWelfareSheets:0;
-  saveFareEntry(fare,Date.now(),selectedFarePaymentMethod,discount,etc,welfareSheets,etcPaymentMethod);
+  const tripTs=editingFareTs||Date.now();
+  removeFareEntriesAt(editingFareTs);
+  saveFareEntry(fare,tripTs,selectedFarePaymentMethod,discount,etc,welfareSheets,etcPaymentMethod);
+  editingFareTs=null;
   closeOverlay('fare-modal');
+}
+function removeFareEntriesAt(ts){
+  if(!ts)return;
+  const log=JSON.parse(localStorage.getItem('sa_fare_log')||'[]').filter(e=>e.ts!==ts);
+  localStorage.setItem('sa_fare_log',JSON.stringify(log));
 }
 function saveFareEntry(fare,tripTs,paymentMethod,discount,etc,welfareSheets,etcPaymentMethod){
   const entry={
@@ -780,7 +853,7 @@ function saveFareEntry(fare,tripTs,paymentMethod,discount,etc,welfareSheets,etcP
   const log=JSON.parse(localStorage.getItem('sa_fare_log')||'[]');
   log.push(entry);
   localStorage.setItem('sa_fare_log',JSON.stringify(log));
-  toast(`💰 運賃 ¥${fare.toLocaleString()} を記録しました`);
+  toast(editingFareTs?`✏️ 運賃を ¥${fare.toLocaleString()} に訂正しました`:`💰 運賃 ¥${fare.toLocaleString()} を記録しました`);
   renderEntriesList();renderStatsBar();
 }
 function deleteFareEntry(ts){
@@ -815,6 +888,7 @@ function renderEntriesList(){
       <div class="entry-badge" style="background:var(--accent)">#${n}</div>
       <div class="entry-main"><div class="entry-title">${fmtHM(e.ts)} 運賃</div><div class="entry-sub">${sub}</div></div>
       <div class="entry-amount">¥${e.fare.toLocaleString()}</div>
+      <button class="entry-edit" onclick="editFareEntry(${e.ts})">訂正</button>
       <button class="entry-del" onclick="deleteFareEntry(${e.ts})">削除</button>
     </div>`});
   });
@@ -823,6 +897,7 @@ function renderEntriesList(){
       <div class="entry-badge" style="background:var(--red)">⛽</div>
       <div class="entry-main"><div class="entry-title">${fmtHM(e.ts)} 燃料</div></div>
       <div class="entry-amount" style="color:var(--text)">${e.amount.toFixed(2)}L</div>
+      <button class="entry-edit" onclick="editFuelEntry(${e.ts})">訂正</button>
       <button class="entry-del" onclick="deleteFuelEntry(${e.ts})">削除</button>
     </div>`});
   });
@@ -831,6 +906,7 @@ function renderEntriesList(){
       <div class="entry-badge" style="background:var(--cyan)">🛣</div>
       <div class="entry-main"><div class="entry-title">${fmtHM(e.ts)} 無料高速</div></div>
       <div class="entry-amount" style="color:var(--text)">¥${e.amount.toLocaleString()}</div>
+      <button class="entry-edit" onclick="editHighwayEntry(${e.ts})">訂正</button>
       <button class="entry-del" onclick="deleteHighwayEntry(${e.ts})">削除</button>
     </div>`});
   });
@@ -839,6 +915,7 @@ function renderEntriesList(){
       <div class="entry-badge" style="background:var(--purple)">🛣</div>
       <div class="entry-main"><div class="entry-title">${fmtHM(e.ts)} 自腹高速</div></div>
       <div class="entry-amount" style="color:var(--text)">¥${e.amount.toLocaleString()}</div>
+      <button class="entry-edit" onclick="editJibaraEntry(${e.ts})">訂正</button>
       <button class="entry-del" onclick="deleteJibaraEntry(${e.ts})">削除</button>
     </div>`});
   });
