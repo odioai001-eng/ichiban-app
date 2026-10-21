@@ -15,6 +15,8 @@
 <meta name="apple-mobile-web-app-title" content="売上時間管理">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d0d1a">
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <style>
 :root{
   --bg:#0d0d1a;--surface:#161628;--surface2:#1e1e35;--border:#2a2a4a;
@@ -115,10 +117,47 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
   width:100%;max-width:480px;max-height:85vh;overflow-y:auto}
 .modal h3{font-size:15px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between}
 .mc{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}
+.acc-screen{display:none;position:fixed;inset:0;background:var(--bg);z-index:5000;
+  align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.acc-screen.open{display:flex}
+.acc-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:400px;margin:auto}
+.acc-box h2{font-size:20px;font-weight:800;margin:0 0 10px}
+.acc-box p{font-size:13px;color:var(--muted);line-height:1.7;margin:0 0 16px}
 .empty-hint{text-align:center;color:var(--muted);font-size:12px;padding:30px 10px}
 </style>
 </head>
 <body>
+
+<!-- 利用申請（管理者の許可制）。許可されるまでアプリの画面の上に重ねて表示する -->
+<div class="acc-screen" id="access-screen">
+  <div class="acc-box">
+    <div id="acc-loading">
+      <h2>確認中…</h2>
+      <p>利用の許可を確認しています。しばらくお待ちください。</p>
+    </div>
+    <div id="acc-offline" style="display:none">
+      <h2>接続できません 📡</h2>
+      <p>利用の許可を確認するため、インターネットへの接続が必要です。電波の良い場所でもう一度お試しください。</p>
+      <button class="btn btn-p" style="width:100%;padding:12px" onclick="checkAccess()">🔄 もう一度確認する</button>
+    </div>
+    <div id="acc-apply" style="display:none">
+      <h2>利用申請 📝</h2>
+      <p>このアプリは管理者の許可が必要です。名字と名前を入力して申請してください。許可されると、自動で使えるようになります。</p>
+      <div id="acc-rejected-msg" style="display:none;font-size:13px;color:var(--red);margin-bottom:12px;line-height:1.6">前回の申請は許可されませんでした。内容を確認して、もう一度申請できます。</div>
+      <label>名字</label>
+      <input type="text" id="acc-last" maxlength="20" placeholder="例: 高橋" autocomplete="family-name">
+      <label>名前</label>
+      <input type="text" id="acc-first" maxlength="20" placeholder="例: 一郎" autocomplete="given-name">
+      <button class="btn btn-p" style="width:100%;padding:12px" id="acc-submit-btn" onclick="submitAccessRequest()">📨 申請する</button>
+    </div>
+    <div id="acc-pending" style="display:none">
+      <h2>許可待ちです ⏳</h2>
+      <p>申請を受け付けました。管理者が許可すると、自動でこの画面が切り替わります。アプリを閉じても大丈夫です。</p>
+      <div class="card" id="acc-pending-info" style="font-size:13px;line-height:1.8"></div>
+      <button class="btn btn-g" style="width:100%;padding:12px" onclick="editAccessRequest()">✏️ 申請内容を修正する</button>
+    </div>
+  </div>
+</div>
 
 <div class="hdr">
   <!-- ⚙️は退勤ボタンを誤って押さないよう、反対側（左端）に置く -->
@@ -1348,10 +1387,154 @@ function closeSettlementReport(){
   currentSettlementIndex=-1;
 }
 
+// ===== 利用申請（管理者の許可制） =====
+// 端末ごとにIDを作り、app_pending/{ID} に申請、管理者が本体アプリ（イチバン羽田チームアプリ）の
+// 管理者モードで許可すると app_approved/{ID} が作られる。本体アプリ・イチバン売上&時間管理アプリ
+// の申請とは別の場所に保存し、管理者画面でも別々に管理する。記録自体は今までどおりこの端末の
+// 中だけに保存し、サーバーには申請・許可の情報だけを置く
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyBkvfkNDnPW2jBmdWXYol52DyKwE6fDSSU",
+  authDomain:"ichiban-hanedateam.firebaseapp.com",
+  databaseURL:"https://ichiban-hanedateam-default-rtdb.firebaseio.com",
+  projectId:"ichiban-hanedateam",
+  storageBucket:"ichiban-hanedateam.firebasestorage.app",
+  messagingSenderId:"775194714893",
+  appId:"1:775194714893:web:b89446b29ddbc8213a0644"
+};
+let db=null;
+function tryFirebase(){
+  try{firebase.initializeApp(FIREBASE_CONFIG);db=firebase.database();}catch(e){db=null;}
+}
+function appDeviceId(){
+  let id=localStorage.getItem('sa_device_id');
+  if(!id){
+    id='ad'+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+    localStorage.setItem('sa_device_id',id);
+  }
+  return id;
+}
+let accessListening=false;
+function showAccess(state){
+  ['loading','offline','apply','pending'].forEach(k=>{
+    document.getElementById('acc-'+k).style.display=k===state?'block':'none';
+  });
+  document.getElementById('access-screen').classList.add('open');
+}
+function hideAccess(){document.getElementById('access-screen').classList.remove('open');}
+// 申請制を入れる前からこの端末で使っていた人は、申請なしでそのまま使えるようにする
+function isExistingUser(){
+  return ['sa_settings','sa_fare_log','sa_shift_log','sa_settlement_log','sa_runtime_state'].some(k=>!!localStorage.getItem(k));
+}
+function registerExistingUser(){
+  const name=(loadSettings().name||'').trim();
+  db.ref('app_approved/'+appDeviceId()).set({lastName:name,firstName:'',ts:Date.now(),auto:true})
+    .then(()=>localStorage.setItem('sa_access_registered','1')).catch(()=>{});
+}
+function checkAccess(){
+  const okLocal=localStorage.getItem('sa_access_ok')==='1';
+  // 以前から使っている人の自動許可は、この端末で1回だけ（利用停止された人が再び自動許可されないように）
+  if(!okLocal&&isExistingUser()&&localStorage.getItem('sa_access_checked')!=='1'){
+    localStorage.setItem('sa_access_checked','1');
+    localStorage.setItem('sa_access_ok','1');
+    checkAccess();
+    return;
+  }
+  if(okLocal)hideAccess();
+  else showAccess('loading');
+  if(!db){if(!okLocal)showAccess('offline');return;}
+  localStorage.setItem('sa_access_checked','1');
+  const id=appDeviceId();
+  db.ref('app_approved/'+id).once('value').then(snap=>{
+    if(snap.val()){onAccessGranted(snap.val());return;}
+    if(okLocal){
+      // 許可の記録がサーバーに無い: 一度でも登録できていたなら管理者に利用停止されたもの、
+      // まだ登録できていない（以前から使っている人で、前回は送信できなかった等）なら登録し直す
+      if(localStorage.getItem('sa_access_registered')!=='1'){registerExistingUser();return;}
+      localStorage.removeItem('sa_access_ok');
+      localStorage.removeItem('sa_access_registered');
+      toast('⚠️ 管理者により利用が停止されました');
+    }
+    return db.ref('app_pending/'+id).once('value').then(s2=>{
+      const p=s2.val();
+      if(p&&p.status==='pending'){showPendingAccess(p);listenAccess();}
+      else showApplyAccess(p);
+    });
+  }).catch(()=>{if(!okLocal)showAccess('offline');});
+}
+function showApplyAccess(prev){
+  if(prev){
+    document.getElementById('acc-last').value=prev.lastName||'';
+    document.getElementById('acc-first').value=prev.firstName||'';
+  }
+  document.getElementById('acc-rejected-msg').style.display=(prev&&prev.status==='rejected')?'block':'none';
+  showAccess('apply');
+}
+function showPendingAccess(p){
+  const el=document.getElementById('acc-pending-info');
+  el.textContent='';
+  [['お名前',(p.lastName||'')+' '+(p.firstName||'')],['申請日時',new Date(p.ts||Date.now()).toLocaleString('ja-JP')]].forEach(([k,v])=>{
+    const row=document.createElement('div');
+    row.textContent=k+'： '+v;
+    el.appendChild(row);
+  });
+  showAccess('pending');
+}
+function submitAccessRequest(){
+  const lastName=document.getElementById('acc-last').value.trim();
+  const firstName=document.getElementById('acc-first').value.trim();
+  if(!lastName||!firstName){toast('⚠️ 名字と名前を入力してください');return;}
+  if(!db){toast('⚠️ サーバーに接続できません。電波の良い場所でお試しください');return;}
+  const btn=document.getElementById('acc-submit-btn');
+  btn.disabled=true;
+  const req={lastName,firstName,ts:Date.now(),status:'pending'};
+  // 送信が確認できてから許可待ちに進む（届いていないのに待ち続けることを防ぐ）
+  db.ref('app_pending/'+appDeviceId()).set(req).then(()=>{
+    btn.disabled=false;
+    showPendingAccess(req);
+    listenAccess();
+    toast('✅ 申請しました');
+  }).catch(()=>{
+    btn.disabled=false;
+    toast('⚠️ 申請の送信に失敗しました。電波状況を確認してもう一度お試しください');
+  });
+}
+function editAccessRequest(){
+  db.ref('app_pending/'+appDeviceId()).once('value').then(s=>showApplyAccess(s.val()))
+    .catch(()=>showAccess('apply'));
+}
+function listenAccess(){
+  if(accessListening||!db)return;
+  accessListening=true;
+  const id=appDeviceId();
+  db.ref('app_approved/'+id).on('value',snap=>{
+    if(snap.val()&&localStorage.getItem('sa_access_ok')!=='1'){
+      onAccessGranted(snap.val());
+      toast('✅ 利用が許可されました！');
+    }
+  });
+  db.ref('app_pending/'+id+'/status').on('value',snap=>{
+    if(snap.val()==='rejected'&&localStorage.getItem('sa_access_ok')!=='1'){
+      db.ref('app_pending/'+id).once('value').then(s=>showApplyAccess(s.val()));
+    }
+  });
+}
+function onAccessGranted(v){
+  const wasLocked=localStorage.getItem('sa_access_ok')!=='1';
+  localStorage.setItem('sa_access_ok','1');
+  localStorage.setItem('sa_access_registered','1');
+  if(!wasLocked)return;
+  // 申請した名前を、出勤時の確認画面の氏名に入れておく（未設定の場合のみ）
+  const s=loadSettings();
+  if(!s.name&&v.lastName){s.name=(v.lastName+' '+(v.firstName||'')).trim();saveSettings(s);}
+  hideAccess();
+}
+
 // ===== 初期化 =====
 window.addEventListener('load',()=>{
   restoreRuntimeState();
   applyDutyUI();
+  tryFirebase();
+  checkAccess();
 });
 </script>
 </body>
