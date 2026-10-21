@@ -99,6 +99,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
 .entry-card.fare .entry-sub{font-size:12px;color:var(--text);opacity:.75}
 .entry-card.fare .entry-amount{font-size:19px}
 .entry-del{background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:4px}
+.help-link{font-size:12px;font-weight:700;color:var(--accent);text-decoration:none;padding:4px 2px}
 .entry-edit{background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;padding:4px}
 .toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);
   background:rgba(30,30,60,.95);color:#fff;padding:7px 18px;border-radius:20px;
@@ -136,7 +137,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
       <button class="btn btn-g action-btn half" onclick="promptHighwayEntry()"><span class="ic">🛣</span>無料高速</button>
       <button class="btn btn-g action-btn half" onclick="promptFuelEntry()"><span class="ic">⛽</span>GAS</button>
     </div>
-    <div class="sec">本日の記録</div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center">本日の記録<a class="help-link" href="manual.html">📖 使い方</a></div>
     <div id="entries-list"></div>
   </div>
 </div>
@@ -197,6 +198,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
 <div class="overlay" id="settings-modal">
   <div class="modal">
     <h3>⚙️ 設定 <button class="mc" onclick="closeOverlay('settings-modal')">✕</button></h3>
+    <a class="btn btn-g" href="manual.html" style="display:block;text-align:center;text-decoration:none;margin-bottom:14px;padding:10px">📖 使い方ガイドを開く</a>
 
     <div class="sec">🧾 本日の納金額</div>
     <div class="card">
