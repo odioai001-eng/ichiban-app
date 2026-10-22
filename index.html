@@ -62,6 +62,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sa
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
   padding:14px;margin-bottom:10px}
 label{font-size:12px;color:var(--muted);display:block;margin-bottom:3px}
+.kp-in{cursor:pointer;font-variant-numeric:tabular-nums}
 input[type=text],input[type=number],input[type=time],input[type=date]{
   width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);
   border-radius:10px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;margin-bottom:12px}
@@ -204,21 +205,22 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
     <input type="number" inputmode="decimal" id="ds-meter" placeholder="例: 140031">
     <label>上がり予定時刻</label>
     <input type="time" id="ds-finish">
-    <button class="btn btn-p" style="width:100%;padding:12px" onclick="proceedToDeviceConfirm()">次へ（端末の確認）</button>
-  </div>
-</div>
-
-<!-- 端末（名前・車両）の確認 -->
-<div class="overlay" id="duty-device-modal">
-  <div class="modal">
-    <h3>📋 端末の確認 <button class="mc" onclick="closeOverlay('duty-device-modal')">✕</button></h3>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">この内容で出勤します。違う場合は修正してください。</div>
-    <label>氏名</label>
-    <input type="text" id="dv-name">
-    <label>車両番号</label>
-    <input type="text" id="dv-car">
-    <label>ナンバー</label>
-    <input type="text" id="dv-plate">
+    <!-- 車両：前回と同じなら1行で表示し、違う時だけ「変更する」で入力欄を開く -->
+    <div id="dv-summary" class="card" style="display:none;align-items:center;gap:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--muted)">🚗 前回と同じ車両で出勤します</div>
+        <div id="dv-summary-text" style="font-size:14px;font-weight:700;margin-top:2px;word-break:break-all"></div>
+      </div>
+      <button type="button" class="btn btn-g" style="flex-shrink:0;font-size:12px;padding:6px 10px" onclick="showDutyVehicleInputs()">変更する</button>
+    </div>
+    <div id="dv-inputs">
+      <label>氏名</label>
+      <input type="text" id="dv-name">
+      <label>車両番号</label>
+      <input type="number" inputmode="numeric" id="dv-car" placeholder="例: 501">
+      <label>ナンバー</label>
+      <input type="text" id="dv-plate" placeholder="例: 品川 500 あ 1234">
+    </div>
     <button class="btn btn-p" style="width:100%;padding:12px" onclick="confirmStartDuty()">✅ 出勤する</button>
   </div>
 </div>
@@ -275,7 +277,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
       <label>氏名</label>
       <input type="text" id="s-name">
       <label>車両番号</label>
-      <input type="text" id="s-car">
+      <input type="number" inputmode="numeric" id="s-car" placeholder="例: 501">
       <label>ナンバー</label>
       <input type="text" id="s-plate">
       <button class="btn btn-p" style="width:100%" onclick="saveDriverSettings()">保存する</button>
@@ -402,7 +404,7 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
 </div>
 
 <!-- 数字入力キーパッド -->
-<div class="overlay" id="num-keypad-overlay" style="z-index:9500">
+<div class="overlay" id="num-keypad-overlay" style="z-index:9800">
   <div class="modal" style="max-width:300px">
     <h3><span id="num-keypad-title-text">数字を入力</span> <button class="mc" onclick="cancelNumKeypad()">✕</button></h3>
     <div id="num-keypad-display" style="text-align:center;font-size:32px;font-weight:800;
@@ -423,6 +425,32 @@ input[type=text],input[type=number],input[type=time],input[type=date]{
       <button type="button" class="btn btn-g" onclick="numKeypadBackspace()" style="padding:16px;font-size:18px">⌫</button>
     </div>
     <button class="btn btn-p" onclick="confirmNumKeypad()" style="width:100%">確定</button>
+  </div>
+</div>
+
+<!-- 時刻入力用のテンキー（数字4ケタで HH:MM。例: 0930 → 09:30） -->
+<div class="overlay" id="time-keypad-overlay" style="z-index:9800">
+  <div class="modal" style="max-width:300px">
+    <h3><span id="time-keypad-title">時刻を入力</span> <button class="mc" onclick="cancelTimeKeypad()">✕</button></h3>
+    <div id="time-keypad-display" style="text-align:center;font-size:32px;font-weight:800;
+      font-variant-numeric:tabular-nums;letter-spacing:2px;color:var(--cyan);
+      background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:6px">--:--</div>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:10px">数字4ケタで入力（例: 0930 → 09:30）</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('1')" style="padding:16px;font-size:18px">1</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('2')" style="padding:16px;font-size:18px">2</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('3')" style="padding:16px;font-size:18px">3</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('4')" style="padding:16px;font-size:18px">4</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('5')" style="padding:16px;font-size:18px">5</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('6')" style="padding:16px;font-size:18px">6</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('7')" style="padding:16px;font-size:18px">7</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('8')" style="padding:16px;font-size:18px">8</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('9')" style="padding:16px;font-size:18px">9</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadClear()" style="padding:16px;font-size:15px">C</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadPress('0')" style="padding:16px;font-size:18px">0</button>
+      <button type="button" class="btn btn-g" onclick="timeKeypadBackspace()" style="padding:16px;font-size:18px">⌫</button>
+    </div>
+    <button class="btn btn-p" onclick="confirmTimeKeypad()" style="width:100%">確定</button>
   </div>
 </div>
 
@@ -462,6 +490,75 @@ function promptNumber(title,defaultValue,allowDecimal){
     document.getElementById('num-keypad-display').textContent=dv;
     document.getElementById('num-keypad-dot').style.display=allowDecimal?'':'none';
     openOverlay('num-keypad-overlay');
+  });
+}
+// 時刻用テンキー。promptNumberと同じく Promise で "HH:MM"（キャンセル時はnull）を返す
+let timeKeypadResolve=null,timeKeypadDigits='',timeKeypadFresh=true;
+function renderTimeKeypad(){
+  const disp=document.getElementById('time-keypad-display');
+  if(!timeKeypadDigits){disp.textContent='--:--';return;}
+  const d=timeKeypadDigits.padStart(4,'0');
+  disp.textContent=d.slice(0,2)+':'+d.slice(2);
+}
+function promptTime(title,current){
+  return new Promise(resolve=>{
+    timeKeypadResolve=resolve;
+    document.getElementById('time-keypad-title').textContent=title||'時刻を入力';
+    timeKeypadDigits=String(current||'').replace(/\D/g,'').slice(-4);
+    timeKeypadFresh=true;
+    renderTimeKeypad();
+    openOverlay('time-keypad-overlay');
+  });
+}
+function timeKeypadPress(ch){
+  if(timeKeypadFresh){timeKeypadDigits='';timeKeypadFresh=false;}
+  if(timeKeypadDigits.length>=4)return;
+  timeKeypadDigits+=ch;renderTimeKeypad();
+}
+function timeKeypadBackspace(){timeKeypadFresh=false;timeKeypadDigits=timeKeypadDigits.slice(0,-1);renderTimeKeypad();}
+function timeKeypadClear(){timeKeypadFresh=false;timeKeypadDigits='';renderTimeKeypad();}
+function cancelTimeKeypad(){
+  closeOverlay('time-keypad-overlay');
+  const r=timeKeypadResolve;timeKeypadResolve=null;if(r)r(null);
+}
+function confirmTimeKeypad(){
+  let val='';
+  if(timeKeypadDigits){
+    const d=timeKeypadDigits.padStart(4,'0');
+    if(parseInt(d.slice(0,2),10)>23||parseInt(d.slice(2),10)>59){toast('⚠️ 正しい時刻を入力してください（00:00〜23:59）');return;}
+    val=d.slice(0,2)+':'+d.slice(2);
+  }
+  closeOverlay('time-keypad-overlay');
+  const r=timeKeypadResolve;timeKeypadResolve=null;if(r)r(val);
+}
+// 数字・時刻の入力欄は、OS標準のキーボードではなくアプリのテンキーで入力する。
+// 欄をタップするとテンキーを開き、確定した値を欄に入れて input/change イベントを送る
+function inputTitle(el){
+  const prev=el.previousElementSibling;
+  if(prev&&(prev.tagName==='LABEL'||prev.tagName==='DIV')&&prev.textContent.trim())return prev.textContent.trim();
+  return el.placeholder||'数字を入力';
+}
+function setInputValue(el,val){
+  el.value=val;
+  el.dispatchEvent(new Event('input',{bubbles:true}));
+  el.dispatchEvent(new Event('change',{bubbles:true}));
+}
+function attachKeypads(){
+  document.querySelectorAll('input[type=number]').forEach(el=>{
+    const allowDecimal=el.getAttribute('inputmode')==='decimal';
+    el.type='text';el.readOnly=true;el.setAttribute('inputmode','none');el.classList.add('kp-in');
+    el.addEventListener('click',async()=>{
+      const val=await promptNumber(inputTitle(el),el.value,allowDecimal);
+      if(val!==null)setInputValue(el,val);
+    });
+  });
+  document.querySelectorAll('input[type=time]').forEach(el=>{
+    el.type='text';el.readOnly=true;el.setAttribute('inputmode','none');el.classList.add('kp-in');
+    if(!el.placeholder)el.placeholder='--:--';
+    el.addEventListener('click',async()=>{
+      const val=await promptTime(inputTitle(el),el.value);
+      if(val!==null)setInputValue(el,val);
+    });
   });
 }
 function numKeypadPress(ch){
@@ -571,10 +668,22 @@ function openDutyStartModal(){
   document.getElementById('ds-meter').value='';
   const def=new Date(now.getTime()+9*3600*1000);
   document.getElementById('ds-finish').value=def.toTimeString().slice(0,5);
+  // 前回の氏名・車両を入れておき、登録済みなら1行の表示にまとめる（毎回入力しなくて済むように）
+  const s=loadSettings();
+  document.getElementById('dv-name').value=s.name||'';
+  document.getElementById('dv-car').value=s.car||'';
+  document.getElementById('dv-plate').value=s.plate||'';
+  const saved=!!(s.car||s.plate);
+  document.getElementById('dv-summary-text').textContent=[s.name,s.car?'車両 '+s.car:'',s.plate].filter(Boolean).join(' ／ ');
+  document.getElementById('dv-summary').style.display=saved?'flex':'none';
+  document.getElementById('dv-inputs').style.display=saved?'none':'block';
   openOverlay('duty-start-modal');
 }
-let pendingDutyStart=null;
-function proceedToDeviceConfirm(){
+function showDutyVehicleInputs(){
+  document.getElementById('dv-summary').style.display='none';
+  document.getElementById('dv-inputs').style.display='block';
+}
+function confirmStartDuty(){
   const timeVal=document.getElementById('ds-time').value;
   const meterVal=parseFloat(document.getElementById('ds-meter').value);
   const finishVal=document.getElementById('ds-finish').value;
@@ -591,29 +700,18 @@ function proceedToDeviceConfirm(){
     if(finishDate.getTime()<=startDate.getTime())finishDate=new Date(finishDate.getTime()+24*3600*1000);
     finishTs=finishDate.getTime();
   }
-  pendingDutyStart={startTs:startDate.getTime(),meter:meterVal,finishTs};
-  const s=loadSettings();
-  document.getElementById('dv-name').value=s.name||'';
-  document.getElementById('dv-car').value=s.car||'';
-  document.getElementById('dv-plate').value=s.plate||'';
-  closeOverlay('duty-start-modal');
-  openOverlay('duty-device-modal');
-}
-function confirmStartDuty(){
-  if(!pendingDutyStart)return;
   const s=loadSettings();
   s.name=document.getElementById('dv-name').value.trim();
   s.car=document.getElementById('dv-car').value.trim();
   s.plate=document.getElementById('dv-plate').value.trim();
   saveSettings(s);
   isDuty=true;
-  dutyStart=new Date(pendingDutyStart.startTs);
-  dutyStartMeter=pendingDutyStart.meter;
-  planFinishTs=pendingDutyStart.finishTs;
+  dutyStart=startDate;
+  dutyStartMeter=meterVal;
+  planFinishTs=finishTs;
   fuelEntries=[];highwayEntries=[];jibaraHighwayEntries=[];
-  pendingDutyStart=null;
   saveRuntimeState();
-  closeOverlay('duty-device-modal');
+  closeOverlay('duty-start-modal');
   applyDutyUI();
   toast('🚕 出勤しました');
 }
@@ -1107,7 +1205,7 @@ function renderShiftEntries(){
     </div>`;
   }).join('');
 }
-function editShiftEntry(startTs){
+async function editShiftEntry(startTs){
   const log=JSON.parse(localStorage.getItem('sa_shift_log')||'[]');
   const idx=log.findIndex(s=>s.startTs===startTs);
   if(idx<0)return;
@@ -1115,9 +1213,10 @@ function editShiftEntry(startTs){
   const curStartDate=new Date(cur.startTs);
   const curStartStr=fmtHM(cur.startTs);
   const curEndStr=cur.endTs?fmtHM(cur.endTs):'';
-  const newStartVal=prompt(`出勤時刻（${cur.dateStr}、例: 09:00）`,curStartStr);
+  const newStartVal=await promptTime(`出勤時刻（${cur.dateStr}）`,curStartStr);
   if(newStartVal===null)return;
-  const newEndVal=prompt('退勤時刻（例: 21:30。出勤時刻より前の場合は翌日扱いにします）',curEndStr);
+  // 出勤時刻より前の退勤時刻は翌日扱いにする
+  const newEndVal=await promptTime('退勤時刻',curEndStr);
   if(newEndVal===null)return;
   const sm=newStartVal.trim().match(/^(\d{1,2}):(\d{2})$/);
   const em=newEndVal.trim().match(/^(\d{1,2}):(\d{2})$/);
@@ -1531,6 +1630,7 @@ function onAccessGranted(v){
 
 // ===== 初期化 =====
 window.addEventListener('load',()=>{
+  attachKeypads();
   restoreRuntimeState();
   applyDutyUI();
   tryFirebase();
